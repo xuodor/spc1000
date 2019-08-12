@@ -4,7 +4,7 @@ android {
     compileSdkVersion 28
     buildToolsVersion "28.0.3"
     defaultConfig {
-        applicationId "pvallet.com.github.hello_sdl2"
+        applicationId "com.jindor.app.spc1000"
         minSdkVersion 21
         targetSdkVersion 28
         versionCode 1

@@ -1,69 +1,87 @@
 #include <SDL.h>
-#include <SDL_image.h>
 #include <stdio.h>
+#include <android/log.h>
 
-int main(int /*argc*/, char* /*argv*/[]) {
+#define APPNAME "spc1000"
 
-    SDL_Window *window;                    // Declare a pointer
+void PutPixel(int x, int y, Uint32 c, SDL_Surface *surface) {
+  SDL_PixelFormat *fmt = surface->format;
+  const unsigned int offset = surface->pitch * y + x * fmt->BytesPerPixel;
+  unsigned char *pixels = (unsigned char *)surface->pixels;
+  pixels[offset + 0] = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
+  pixels[offset + 1] = ((c & fmt->Gmask) >> fmt->Gshift) << fmt->Gloss;
+  pixels[offset + 2] = ((c & fmt->Bmask) >> fmt->Bshift) << fmt->Bloss;
+}
 
-    SDL_Init(SDL_INIT_VIDEO);              // Initialize SDL2
+int main(int /* argc*/, char *argv[]) {
+  SDL_Window *window; // Declare a pointer
 
-    // Create an application window with the following settings:
-    window = SDL_CreateWindow(
-        "An SDL2 window",                  // window title
-        SDL_WINDOWPOS_UNDEFINED,           // initial x position
-        SDL_WINDOWPOS_UNDEFINED,           // initial y position
-        640,                               // width, in pixels
-        480,                               // height, in pixels
-        SDL_WINDOW_OPENGL                  // flags - see below
-    );
+  SDL_Init(SDL_INIT_VIDEO); // Initialize SDL2
 
-    // Check that the window was successfully created
-    if (window == NULL) {
-        // In the case that the window could not be made...
-        printf("Could not create window: %s\n", SDL_GetError());
-        return 1;
-    }
+  // Create an application window with the following settings:
+  window = SDL_CreateWindow("An SDL2 window",        // window title
+                            SDL_WINDOWPOS_UNDEFINED, // initial x position
+                            SDL_WINDOWPOS_UNDEFINED, // initial y position
+                            512,                     // width, in pixels
+                            384,                     // height, in pixels
+                            SDL_WINDOW_OPENGL        // flags - see below
+  );
 
-    // The window is open: could enter program loop here (see SDL_PollEvent())
-    // Setup renderer
-    SDL_Renderer* renderer = NULL;
-    renderer =  SDL_CreateRenderer( window, -1, SDL_RENDERER_ACCELERATED);
+  // Check that the window was successfully created
+  if (window == NULL) {
+    // In the case that the window could not be made...
+    printf("Could not create window: %s\n", SDL_GetError());
+    return 1;
+  }
 
-    // Set render color to red ( background will be rendered in this color )
-    SDL_SetRenderDrawColor( renderer, 255, 0, 0, 255 );
+  // The window is open: could enter program loop here (see SDL_PollEvent())
+  // Setup renderer
+  SDL_Renderer *renderer = NULL;
+  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    // Clear winow
-    SDL_RenderClear( renderer );
+  SDL_Rect r;
+  r.x = 0;
+  r.y = 0;
+  r.w = 512;
+  r.h = 384;
+  int width = 512;
+  int height = 384;
+  // Render image
+  SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 24,
+                                                        SDL_PIXELFORMAT_RGB888);
+  SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 
-    // bouyatest
+  // SDL_FreeSurface(surface);
+  SDL_PixelFormat *fmt = surface->format;
+  Uint32 c = SDL_MapRGB(surface->format, 0, 255, 0);
+  int bpp = fmt->BytesPerPixel;
+  unsigned char *pixels = (unsigned char *)surface->pixels;
 
-    // Creat a rect at pos ( 50, 50 ) that's 50 pixels wide and 50 pixels high.
-    SDL_Rect r;
-    r.x = 50;
-    r.y = 50;
-    r.w = 500;
-    r.h = 500;
+  SDL_RendererInfo info;
+  SDL_GetRendererInfo(renderer, &info);
+  for (Uint32 i = 0; i < info.num_texture_formats; i++) {
+    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "format: %s",
+                        SDL_GetPixelFormatName(info.texture_formats[i]));
+  }
+  __android_log_print(ANDROID_LOG_VERBOSE, APPNAME,
+                      "(%d, %d), pitch: %d, bpp: %d", surface->w, surface->h,
+                      surface->pitch, bpp);
 
-    // Set render color to blue ( rect will be rendered in this color )
-    SDL_SetRenderDrawColor( renderer, 0, 0, 255, 255 );
+  // splat down some random pixels
+  for (int i = 0; i < 1000; i++) {
+    PutPixel(rand() % 512, rand() % 384, c, surface);
+  }
 
-    // Render image
-    SDL_Surface *loadedImage = IMG_Load("res/hello.png");
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, loadedImage);
-    SDL_FreeSurface(loadedImage);
+  SDL_UpdateTexture(texture, NULL, &pixels[0], surface->pitch);
+  SDL_RenderCopy(renderer, texture, NULL, &r);
+  SDL_RenderPresent(renderer);
 
-    SDL_RenderCopy(renderer, texture, NULL, &r);
+  SDL_Delay(10 * 1000);
 
-    // Render the rect to the screen
-    SDL_RenderPresent(renderer);
+  // Close and destroy the window
+  SDL_DestroyWindow(window);
 
-    SDL_Delay(8000);  // Pause execution for 3000 milliseconds, for example
-
-    // Close and destroy the window
-    SDL_DestroyWindow(window);
-
-    // Clean up
-    SDL_Quit();
-    return 0;
+  // Clean up
+  SDL_Quit();
+  return 0;
 }

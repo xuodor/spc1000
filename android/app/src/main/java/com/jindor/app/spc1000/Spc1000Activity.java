@@ -1,8 +1,8 @@
-package pvallet.com.github.hello_sdl2;
+package com.jindor.app.spc1000;
 
 import org.libsdl.app.SDLActivity;
 
-public class HelloSDL2Activity extends SDLActivity
+public class Spc1000Activity extends SDLActivity
 {
 	 /**
      * This method is called by SDL before loading the native shared libraries.
@@ -17,7 +17,6 @@ public class HelloSDL2Activity extends SDLActivity
     protected String[] getLibraries() {
         return new String[]{
                 "SDL2",
-                "SDL2_image",
                 "main"
         };
     }
