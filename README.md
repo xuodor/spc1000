@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is an emulator for SPC-1000 ([https://en.wikipedia.org/wiki/SPC-1000](https://en.wikipedia.org/wiki/SPC-1000)) ported on Android device. It was branched off of the Windows-based one developed by Ionique, published at ([https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896)). All the files are redistributed as-is, except some TXT files converted from EUC-KR to UTF-8 encoding.
+This is an emulator for SPC-1000 ([https://en.wikipedia.org/wiki/SPC-1000](https://en.wikipedia.org/wiki/SPC-1000)) ported on Android device. It was branched off of Windows-based one developed and published by Ionique at ([https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896)).
 
 ## Requirements
 - JDK and JRE 8
@@ -20,7 +20,7 @@ cd android
 ./gradlew installDebug
 ```
 
-## How to build (Android Studio 3.2.1)
+## How to build (as of Android Studio 3.2.1)
 
 First download the dependencies (SDL2) as above or manually like below. Then open the ./android folder as an existing project in Android Studio.
 
@@ -40,5 +40,5 @@ Unzip it, put the SDL2-x.x.x folder in `external/SDL2` and rename them to SDL2 s
 ```
 ## Credits
 
-- ([https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896)) Base emulator code.
-- ([https://github.com/pvallet/hello-sdl2-android](https://github.com/pvallet/hello-sdl2-android)) Android SDL2 template.
+- [https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896) Base emulator code. All the files are redistributed as-is, except some TXT files that were converted from EUC-KR to UTF-8 encoding
+- [https://github.com/pvallet/hello-sdl2-android](https://github.com/pvallet/hello-sdl2-android) Android SDL2 template
