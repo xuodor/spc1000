@@ -1,6 +1,10 @@
 // SPC-1000 key mapping for SDL
 
-typedef struct 
+#if SDL_MAJOR_VERSION == 2
+#define SDLKey SDL_Keycode
+#endif
+
+typedef struct
 {
 	SDLKey sym;
 	int keyMatIdx;
@@ -12,8 +16,8 @@ TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
 {
 	{ SDLK_RSHIFT, 0, 0x02, "SHIFT"},
 	{ SDLK_LSHIFT, 0, 0x02, "SHIFT"},
-	{ SDLK_LCTRL, 0, 0x04, "CTRL" }, 
-	{ SDLK_RCTRL, 0, 0x04, "CTRL" }, 
+	{ SDLK_LCTRL, 0, 0x04, "CTRL" },
+	{ SDLK_RCTRL, 0, 0x04, "CTRL" },
 	{ SDLK_PAUSE, 0, 0x10, "BREAK" },
 	{ SDLK_LALT, 0, 0x40, "GRAPH" },
 	{ SDLK_RALT, 0, 0x40, "GRAPH"  },
@@ -49,7 +53,7 @@ TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
 	{ SDLK_f, 4, 0x20, "F" },
 	{ SDLK_r, 4, 0x40, "R" },
 	{ SDLK_4, 4, 0x80, "4" },
-	
+
 	{ SDLK_F1, 5, 0x02, "F1" },
 	{ SDLK_LEFT, 5, 0x04, "->" },
 	{ SDLK_m, 5, 0x10, "M" },
@@ -80,7 +84,7 @@ TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
 	{ SDLK_k, 8, 0x20, "K" },
 	{ SDLK_i, 8, 0x40, "I" },
 	{ SDLK_8, 8, 0x80, "8" },
-	
+
 	{ SDLK_F5, 9, 0x02, "F5" },
 	{ SDLK_MINUS, 9, 0x04, "-" },
 	{ SDLK_0, 9, 0x08, "0" },
