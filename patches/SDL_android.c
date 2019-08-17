@@ -68,7 +68,7 @@ JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetupJNI)(
 
 JNIEXPORT int JNICALL SDL_JAVA_INTERFACE(nativeRunMain)(
         JNIEnv* env, jclass cls,
-        jstring library, jstring function, jobject array);
+        jstring library, jstring function, jbyteArray rom, jbyteArray ini);
 
 JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(onNativeDropFile)(
         JNIEnv* env, jclass jcls,
@@ -287,7 +287,7 @@ void checkJNIReady()
         return;
     }
 
-    SDL_SetMainReady();    
+    SDL_SetMainReady();
 }
 
 /* Activity initialization -- called before SDL_main() to initialize JNI bindings */
@@ -412,7 +412,7 @@ JNIEXPORT void JNICALL SDL_JAVA_CONTROLLER_INTERFACE(nativeSetupJNI)(JNIEnv* mEn
 typedef int (*SDL_main_func)(int argc, char *argv[]);
 
 /* Start up the SDL app */
-JNIEXPORT int JNICALL SDL_JAVA_INTERFACE(nativeRunMain)(JNIEnv* env, jclass cls, jstring library, jstring function, jobject array)
+JNIEXPORT int JNICALL SDL_JAVA_INTERFACE(nativeRunMain)(JNIEnv* env, jclass cls, jstring library, jstring function, jbyteArray jrom, jbyteArray jini)
 {
     int status = -1;
     const char *library_file;
@@ -429,48 +429,25 @@ JNIEXPORT int JNICALL SDL_JAVA_INTERFACE(nativeRunMain)(JNIEnv* env, jclass cls,
         function_name = (*env)->GetStringUTFChars(env, function, NULL);
         SDL_main = (SDL_main_func)dlsym(library_handle, function_name);
         if (SDL_main) {
-            int i;
-            int argc;
-            int len;
-            char **argv;
+            //COPY ARRAY FROM JAVA
+          __android_log_print(ANDROID_LOG_VERBOSE, "SDL", "ROM: %p INI: %p", jrom, jini);
+            jbyte *rom_bytes = (*env)->GetByteArrayElements(env, jrom, NULL);
+            jsize rom_len = (*env)->GetArrayLength(env, jrom);
+//            (*env)->ReleaseByteArrayElements(env, jrom, rom_bytes, 0);
+            char *rom = (char *) malloc(rom_len);
+            (*env)->GetByteArrayRegion(env, jrom, 0, rom_len, (jbyte *)rom);
 
-            /* Prepare the arguments. */
-            len = (*env)->GetArrayLength(env, array);
-            argv = SDL_stack_alloc(char*, 1 + len + 1);
-            argc = 0;
-            /* Use the name "app_process" so PHYSFS_platformCalcBaseDir() works.
-               https://bitbucket.org/MartinFelis/love-android-sdl2/issue/23/release-build-crash-on-start
-             */
-            argv[argc++] = SDL_strdup("app_process");
-            for (i = 0; i < len; ++i) {
-                const char* utf;
-                char* arg = NULL;
-                jstring string = (*env)->GetObjectArrayElement(env, array, i);
-                if (string) {
-                    utf = (*env)->GetStringUTFChars(env, string, 0);
-                    if (utf) {
-                        arg = SDL_strdup(utf);
-                        (*env)->ReleaseStringUTFChars(env, string, utf);
-                    }
-                    (*env)->DeleteLocalRef(env, string);
-                }
-                if (!arg) {
-                    arg = SDL_strdup("");
-                }
-                argv[argc++] = arg;
-            }
-            argv[argc] = NULL;
-
-
-            /* Run the application. */
+            jbyte *ini_bytes = (*env)->GetByteArrayElements(env, jini, NULL);
+            jsize ini_len = (*env)->GetArrayLength(env, jini);
+//            (*env)->ReleaseByteArrayElements(env, jini, ini_bytes, 0);
+            char *ini = (char *) malloc(ini_len);
+            (*env)->GetByteArrayRegion(env, jini, 0, ini_len, (jbyte *)ini);
+            int argc = 2;
+          __android_log_print(ANDROID_LOG_VERBOSE, "SDL", "ROMD: %p INID: %p", rom, ini);
+            char* argv[] = { rom, ini};
             status = SDL_main(argc, argv);
-
-            /* Release the arguments. */
-            for (i = 0; i < argc; ++i) {
-                SDL_free(argv[i]);
-            }
-            SDL_stack_free(argv);
-
+            free(rom);
+            free(ini);
         } else {
             __android_log_print(ANDROID_LOG_ERROR, "SDL", "nativeRunMain(): Couldn't find function %s in library %s", function_name, library_file);
         }
@@ -1660,7 +1637,7 @@ char* Android_JNI_GetClipboardText(void)
     JNIEnv* env = Android_JNI_GetEnv();
     char* text = NULL;
     jstring string;
-    
+
     string = (*env)->CallStaticObjectMethod(env, mActivityClass, midClipboardGetText);
     if (string) {
         const char* utf = (*env)->GetStringUTFChars(env, string, 0);
@@ -1670,7 +1647,7 @@ char* Android_JNI_GetClipboardText(void)
         }
         (*env)->DeleteLocalRef(env, string);
     }
-    
+
     return (text == NULL) ? SDL_strdup("") : text;
 }
 
