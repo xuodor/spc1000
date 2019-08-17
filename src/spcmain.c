@@ -349,6 +349,22 @@ int SaveAsTapeFile(void) {
   }
   return res;
 }
+#else
+int LoadImageFile(void) {
+  return -1;
+}
+
+int SaveImageFile(void) {
+  return -1;
+}
+
+int OpenTapeFile(void) {
+  return -1;
+}
+
+int SaveAsTapeFile(void) {
+  return -1;
+}
 #endif // __ANDROID__
 
 int ReadVal(void) {
