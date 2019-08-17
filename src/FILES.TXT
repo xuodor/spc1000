@@ -1,0 +1,44 @@
+본 소스는 Windows 기반 프로그램으로 Visual C++ 6.0에서 작성한
+project가 포함되어 있습니다.
+(SPCEMUL.dsp, SPCEMUL,dsw)
+
+하지만 hardware-dependent한 부분은 파일 열기/저장 창을 제외하고
+거의 libsdl을 사용하였기 때문에 linux로 포팅에 큰 문제는 없을
+것입니다.
+
+Visual studio 를 사용하실 때에는, libsdl include 위치
+(현재 c:\usr\SDL\include) 및 libsdl library 위치
+(현재 c:\usr\SDL\lib) 위치를 적절히 변경하여야 하며,
+실행시 실행 디렉토리에 SDL.dll, spcall.rom, SPCEMUL.INI
+파일 들이 존재해야 합니다.
+
+= Z-80 emulator =
+Codes.h
+CodesCB.h
+CodesED.h
+CodesXCB.h
+CodesXX.h
+Debug.c
+Tables.h
+Z80.h
+Z80SPC.c  (Z80.c, modified for SPC-1000)
+
+= AY-3-8910 (sound) emulator =
+AY8910.c
+AY8910.h
+
+= SPC-1000 emulator =
+common.h .. SPC-1000 config structure (SPCEMUL.INI)
+MC6847.h .. MC 6847 VDG emulation header
+MC6847.c .. MC 6847 VDG emulation
+spckey.h .. SPC-1000 keyboard matrix definition
+spcmain.c .. SPC-1000 emulator main
+SPCEMUL.INI .. SPC-1000 emulator config file
+
+= etc =
+spcall.rom .. SPC-1000 ROM
+SPCEMUL.dsp .. visula studio project
+SPCEMUL.dsw .. visula studio workspace
+
+
+
