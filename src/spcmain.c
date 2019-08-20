@@ -9,11 +9,16 @@
 #include "MC6847.h" // Video Display Chip (ionique)
 #include "Tables.h" // Z-80 emulator (Marat Fayzullin)
 #include "Z80.h"    // Z-80 emulator (Marat Fayzullin)
+#include "SDL_log.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(__ANDROID__)
+#if defined(__ANDROID__)
+#include <android/log.h>
+#include "spc1000_jni.h"
+#else
 #include "tinyfiledialogs.h"
 #endif
 
@@ -317,10 +322,42 @@ int SaveImageFile(void) {
   }
   return res;
 }
+#else
+int LoadImageFile(void) {
+  FILE *fp;
+  char name[256];
+  int res = OpenImageDialog(name);
+  if (!res) {
+    if ((fp = fopen(name, "rb")) == NULL) {
+      res = -1;
+    } else {
+      fread(&spc, sizeof(spc), 1, fp);
+      fclose(fp);
+    }
+  }
+  return res;
+}
+
+int SaveImageFile(void) {
+  FILE *fp;
+  char name[256];
+  int res = SaveImageDialog(name);
+  if (!res) {
+    if ((fp = fopen(name, "wb")) == NULL) {
+      res = -1;
+    } else {
+      fwrite(&spc, sizeof(spc), 1, fp);
+      fclose(fp);
+    }
+  }
+  return res;
+}
+#endif // __ANDROID__
 
 /*************************************************************/
 /** Cassette Tape Processing                                **/
 /*************************************************************/
+#if !defined(__ANDROID__)
 int OpenTapeFile(void) {
   char const *filters[2] = {"*.tap", "*.TAP"};
   char const *name;
@@ -350,21 +387,30 @@ int SaveAsTapeFile(void) {
   return res;
 }
 #else
-int LoadImageFile(void) {
-  return -1;
-}
-
-int SaveImageFile(void) {
-  return -1;
-}
-
 int OpenTapeFile(void) {
-  return -1;
+  char name[256];
+  int res = OpenTapeDialog(name);
+  if (!res) {
+    if ((spc.IO.cas.rfp = fopen(name, "rb")) == NULL) {
+      res = -1;
+    }
+  }
+  return res;
 }
 
 int SaveAsTapeFile(void) {
-  return -1;
+  char name[256] = "\0";
+  strncpy(name, &(spc.RAM[0x1397]), 16);
+  strcat(name, ".TAP");
+  int res = SaveTapeDialog(name);
+  if (!res) {
+    if ((spc.IO.cas.wfp = fopen(name, "wb")) == NULL) {
+      res = -1;
+    }
+  }
+  return res;
 }
+
 #endif // __ANDROID__
 
 int ReadVal(void) {

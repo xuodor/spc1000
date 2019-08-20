@@ -7,19 +7,18 @@ This is an emulator for SPC-1000 ([https://en.wikipedia.org/wiki/SPC-1000](https
 ## Requirements
 - JDK and JRE 8
 - Android SDK and NDK (with Android Build-tools 28.0.3 and Android Platform API 28, though these are configurable)
-- ANDROID_HOME and ANDROID_NDK_HOME environment variables set (I did this in /etc/environment)
+- ANDROID_HOME and ANDROID_NDK_HOME environment variables set (or create `local.properties` as instructed by gradle when building)
 - Android device (> SDK version 19, Lollipop)
 
 ## How to build (command line)
 
-You can download the dependencies (SDL2), compile your program and then install it on a connected device with the following commands:
+You can download the dependencies, compile your program and then install it on a connected device with the following commands:
 ```
 ./get_dependencies
 cd android
 ./gradlew assembleDebug
 ./gradlew installDebug
 ```
-
 ## How to build (as of Android Studio 3.2.1)
 
 First download the dependencies (SDL2) as above or manually like below. Then open the ./android folder as an existing project in Android Studio.
@@ -38,7 +37,26 @@ Unzip it, put the SDL2-x.x.x folder in `external/SDL2` and rename them to SDL2 s
 | | + Android.mk
 | | | SDL2
 ```
+
+## How to build on other platforms (Linux only for now)
+By-products of the project is that the emulator can be built on other platforms thanks to a cross-platform UI package that replaces the Windows-only UI support in V1.0. Currently verified only to work on Linux but it shouldn't be difficult to get it to work on the other 2 popular platforms.
+
+```
+sudo apt-get install libsdl2-dev
+cd src
+sh build.sh
+```
+
+## TODO's
+- Test builds on Mac/Windows
+- Solve known issues on Android:
+  - Emulator doesn't work after resuming from background/device rotation
+  - Make the emulator .INI file configurable (hard-coded now)
+  - Revert the changes in SDL and handle them in its own activity/jni
+
 ## Credits
 
-- [https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896) Base emulator code. All the files are redistributed as-is, except some TXT files that were converted from EUC-KR to UTF-8 encoding
+- [https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896) Base emulator code
 - [https://github.com/pvallet/hello-sdl2-android](https://github.com/pvallet/hello-sdl2-android) Android SDL2 template
+- [https://github.com/mlabbe/nativefiledialog](https://github.com/mlabbe/nativefiledialog) Cross-platform file open/save dialog library
+- [https://github.com/RustamG/file-dialogs](https://github.com/RustamG/file-dialogs) Android file open/save dialog library

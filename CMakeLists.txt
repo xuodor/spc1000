@@ -7,10 +7,10 @@ set(SOURCE_FILES \\
     src/MC6847.c \\
     src/spcmain.c \\
     src/Debug.c \\
-    src/Z80SPC.c)
+    src/Z80SPC.c \\
+    src/spc1000_jni.c)
 
 set(SDL_LOCATION ${CMAKE_SOURCE_DIR}/external/SDL2)
-
 add_library( SDL2 SHARED IMPORTED )
 add_library( SDL2_image SHARED IMPORTED )
 
@@ -22,6 +22,6 @@ ${DISTRIBUTION_DIR}/${ANDROID_BUILD_DIR}/obj/local/${ANDROID_ABI}/libSDL2_image.
 include_directories(${SDL_LOCATION}/SDL2/include)
 include_directories(${SDL_LOCATION}/SDL2_image)
 
-add_library(main SHARED ${SDL_LOCATION}/SDL2/src/main/android/SDL_android_main.c ${SOURCE_FILES} )
+add_library(main SHARED ${SOURCE_FILES} )
 
 target_link_libraries(main SDL2 log)

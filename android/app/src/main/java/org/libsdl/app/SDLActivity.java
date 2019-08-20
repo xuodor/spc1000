@@ -29,10 +29,12 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ApplicationInfo;
 
+import 	android.support.v4.app.FragmentActivity;
+
 /**
     SDL Activity
 */
-public class SDLActivity extends Activity {
+public class SDLActivity extends FragmentActivity {
     private static final String TAG = "SDL";
 
     public static boolean mIsResumedCalled, mIsSurfaceReady, mHasFocus;

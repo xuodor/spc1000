@@ -13,11 +13,9 @@ static unsigned char
 int currentPage = 0; // current text page
 int XWidth = 0;      // stride for Y+1
 
-#if SDL_MAJOR_VERSION == 2
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *texture;
-#endif
 SDL_Surface *screen;
 
 Uint8 *frameBuf;
@@ -66,13 +64,12 @@ void PutCharPixel(int x, int y, Uint32 c, SDL_Surface *surface) {
 
 /**
  * Put a text character on SDL surface
- * @param x	character x position. in graphics coord. [0..255-8]
+ * @param x character x position. in graphics coord. [0..255-8]
  * @param y character y position. in graphics coord. [0..191-8]
  * @param attr attribute value of the character
  * @warning attribute value is not implemented correctly yet.
  */
 static void PutChar(int x, int y, int ascii, int attr) {
-
   unsigned char *fontData;
   int i, j;
   Uint32 fgColor;
@@ -126,14 +123,9 @@ static void PutChar(int x, int y, int ascii, int attr) {
   SDL_Surface *surface = screen;
   unsigned int offset = XWidth * y + x * bpp * 2;
   unsigned char *pixels = (unsigned char *)surface->pixels;
-  SDL_PixelFormat *fmt = surface->format;
   for (i = 0; i < 12; i++) {
     for (j = 0; j < 8; j++) {
-      if (fontData[i] & (0x80 >> j)) {
-        PutCharPixel(j + x, y + i, fgColor, screen);
-      } else {
-        PutCharPixel(j + x, y + i, bgColor, screen);
-      }
+      PutCharPixel(j + x, y + i, fontData[i] & (0x80 >> j) ? fgColor : bgColor, screen);
     }
   }
 }
@@ -179,17 +171,6 @@ static void PutMidGr(int pos, unsigned char data) {
   x = (pos % 32) * 8;
   y = pos / 32;
 
-// set screenbuffer for a data byte
-#define SET_MIDRESBUF(pBuffer, data)                                           \
-  *(pBuffer + 3) = *(pBuffer + 2) = *(pBuffer + 1) = *(pBuffer) =              \
-      scrnColor[(0xc0 & data) >> 6];                                           \
-  *(pBuffer + 7) = *(pBuffer + 6) = *(pBuffer + 5) = *(pBuffer + 4) =          \
-      scrnColor[(0x30 & data) >> 4];                                           \
-  *(pBuffer + 11) = *(pBuffer + 10) = *(pBuffer + 9) = *(pBuffer + 8) =        \
-      scrnColor[(0x0c & data) >> 2];                                           \
-  *(pBuffer + 15) = *(pBuffer + 14) = *(pBuffer + 13) = *(pBuffer + 12) =      \
-      scrnColor[(0x03 & data)];
-
   Uint8 *bufp = (Uint8 *)(frameBuf + (y * XWidth) + x * 2 * bpp);
   SetMidResBuf(bufp, data);
   bufp += screen->pitch;
@@ -217,7 +198,6 @@ static void PutHiGr(int pos, unsigned char data) {
   unsigned int offset = XWidth * y + x * bpp * 2;
   unsigned char *pixels = (unsigned char *)screen->pixels;
   unsigned char *addr = pixels + offset;
-  SDL_PixelFormat *fmt = screen->format;
 
   for (i = 0; i < 16; i++) {
     PutSinglePixel(addr, bgColor, screen);
@@ -238,23 +218,16 @@ static void PutHiGr(int pos, unsigned char data) {
   }
 }
 
-#if SDL_MAJOR_VERSION == 2
 void UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
   SDL_Rect r;
   r.x = x;
   r.y = y;
   r.w = w;
   r.h = h;
-
   SDL_UpdateTexture(texture, NULL, screen->pixels, screen->pitch);
   SDL_RenderCopy(renderer, texture, NULL, &r);
   SDL_RenderPresent(renderer);
 }
-#else
-void UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
-  SDL_UpdateRect(screen, x, y, w, h);
-}
-#endif
 
 /**
  * Update text area specified by changeLoc
@@ -531,6 +504,7 @@ void InitMC6847(unsigned char *in_VRAM) {
     exit(1);
   }
 
+// Scales the display to fit the entire device screen.
 #if defined(__ANDROID__)
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
   SDL_RenderSetLogicalSize(renderer, 512, 384);
@@ -538,14 +512,12 @@ void InitMC6847(unsigned char *in_VRAM) {
 
   screen = SDL_CreateRGBSurfaceWithFormat(0, width, height, 24,
                                           SDL_PIXELFORMAT_RGB888);
-
   if (!screen) {
     SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
     exit(1);
   }
 
   texture = SDL_CreateTextureFromSurface(renderer, screen);
-
   if (!texture) {
     SDL_Log("Unable to init texture: %s\n", SDL_GetError());
     exit(1);
