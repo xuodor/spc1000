@@ -14,7 +14,7 @@ This is an emulator for SPC-1000 ([https://en.wikipedia.org/wiki/SPC-1000](https
 
 You can download the dependencies, compile your program and then install it on a connected device with the following commands:
 ```
-./get_dependencies
+./get_dependencies  # SDL
 cd android
 ./gradlew assembleDebug
 ./gradlew installDebug
@@ -42,9 +42,9 @@ Unzip it, put the SDL2-x.x.x folder in `external/SDL2` and rename them to SDL2 s
 By-products of the project is that the emulator can be built on other platforms thanks to a cross-platform UI package that replaces the Windows-only UI support in V1.0. Currently verified only to work on Linux but it shouldn't be difficult to get it to work on the other 2 popular platforms.
 
 ```
+./get_dependencies # tinyfiledialogs
 sudo apt-get install libsdl2-dev
-cd src
-sh build.sh
+./build.sh
 ```
 
 ## TODO's
