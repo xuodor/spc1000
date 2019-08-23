@@ -2,6 +2,7 @@ package com.jindor.app.spc1000;
 
 import android.app.DialogFragment;
 import android.content.DialogInterface;
+import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -40,12 +41,12 @@ public class Spc1000Activity
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
     window.getDecorView().setSystemUiVisibility(flags);
     window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    nativeInit(getResources().getAssets());
   }
 
   @Override
   public void onResume() {
     super.onResume();
-    nativeInit();
   }
 
   // Should be public static for the underlying framework to handle the
@@ -98,5 +99,5 @@ public class Spc1000Activity
     // dismiss() is called internally to wrap up the UI flow.
   }
 
-  public native void nativeInit();
+  public native void nativeInit(AssetManager assetManager);
 }

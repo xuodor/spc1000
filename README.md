@@ -52,7 +52,7 @@ sh build.sh
 - Solve known issues on Android:
   - Emulator doesn't work after resuming from background/device rotation
   - Make the emulator .INI file configurable (hard-coded now)
-  - Revert the changes in SDL and handle them in its own activity/jni
+  - Add launcher app icons
 
 ## Credits
 

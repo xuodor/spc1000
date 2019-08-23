@@ -24,4 +24,4 @@ include_directories(${SDL_LOCATION}/SDL2_image)
 
 add_library(main SHARED ${SOURCE_FILES} )
 
-target_link_libraries(main SDL2 log)
+target_link_libraries(main SDL2 log android)

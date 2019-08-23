@@ -2,6 +2,8 @@
 // Java native interface for Spc1000Activity.
 //
 #include <android/log.h>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include <assert.h>
 #include <inttypes.h>
 #include <jni.h>
@@ -21,6 +23,7 @@ typedef struct Context {
   JavaVM *javaVM;
   jclass activityClass;
   jobject activityObj;
+  AAssetManager *assetManager;
 } Context;
 Context context_;
 
@@ -45,12 +48,33 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 // Initiailizes the native object/structs.
 //
 JNIEXPORT void JNICALL Java_com_jindor_app_spc1000_Spc1000Activity_nativeInit(
-    JNIEnv *env, jobject instance) {
-  jclass clz = (*env)->GetObjectClass(env, instance);
+    JNIEnv *env, jobject jobj, jobject jassetManager) {
+  jclass clz = (*env)->GetObjectClass(env, jobj);
   context_.activityClass = (*env)->NewGlobalRef(env, clz);
-  context_.activityObj = (*env)->NewGlobalRef(env, instance);
-
+  context_.activityObj = (*env)->NewGlobalRef(env, jobj);
+  context_.assetManager = AAssetManager_fromJava(env, jassetManager);
   (void)0;
+}
+
+void ReadAsset(AAsset* asset, unsigned char *buf) {
+  const size_t buf_size = 32768;
+  size_t nb_read = 0;
+  while ((nb_read = AAsset_read(asset, buf, buf_size)) > 0) {
+    buf += nb_read;
+  }
+}
+
+void Bootup(unsigned char *rom, unsigned char *ini) {
+  AAssetDir* assetDir = AAssetManager_openDir(context_.assetManager, "");
+  const char* asset_name;
+  const size_t rom_size = 32768;
+  while ((asset_name = AAssetDir_getNextFileName(assetDir)) != NULL) {
+      AAsset* asset = AAssetManager_open(context_.assetManager, asset_name, AASSET_MODE_STREAMING);
+      if (!strcmp("spcall.rom", asset_name)) ReadAsset(asset, rom);
+      else if (!strcmp("spcemul.ini", asset_name)) ReadAsset(asset, ini);
+      AAsset_close(asset);
+  }
+  AAssetDir_close(assetDir);
 }
 
 int FileDialog(bool open, char *ext, char *out) {

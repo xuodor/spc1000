@@ -154,9 +154,10 @@ int read_from_buf(char *buf, char *out, int offset) {
 
 /**
  * Process INI file
- * @param fname INI file name
+ * @param ini_data INI file content
+ * @param ini_len Length of the content
  */
-void ReadINI(char *ini_data) {
+void ReadINI(char *ini_data, int ini_len) {
   static char inputstr[120];
   // default
   spcConfig.colorMode = SPCCOL_NEW1;
@@ -165,7 +166,6 @@ void ReadINI(char *ini_data) {
   spcConfig.casTurbo = 1;
   spcConfig.soundVol = 5;
 
-  int ini_len = 332;
   int offset = 0;
   while (offset < ini_len) {
     int val = 0;
@@ -198,12 +198,6 @@ void ReadINI(char *ini_data) {
       val = GetVal(inputstr);
       if (val == 0 || val == 1)
         spcConfig.casTurbo = val;
-      continue;
-    }
-    if (!str1ncmp("SOUNDVOL", inputstr)) {
-      val = GetVal(inputstr);
-      if (val >= 0 && val <= 40)
-        spcConfig.soundVol = val;
       continue;
     }
     if (!str1ncmp("SOUNDVOL", inputstr)) {
@@ -921,8 +915,10 @@ int main(int argc, char *argv[]) {
   int turboState = 0;
 
 #if defined(__ANDROID__)
-  memcpy(spc.ROM, argv[0], 32768);
-  ReadINI(argv[1]);
+  unsigned char ini_buf[512];
+  memset(ini_buf, 0, 512);
+  Bootup(spc.ROM, ini_buf);
+  ReadINI(ini_buf, strlen(ini_buf));
 #else
   FILE *fp;
   if ((fp = fopen("spcall.rom", "rb")) == NULL) {
@@ -942,7 +938,7 @@ int main(int argc, char *argv[]) {
 
   char *ini = (char *)malloc(size);
   fread(ini, 1, size, fp);
-  ReadINI(ini);
+  ReadINI(ini, size);
   free(ini);
   fclose(fp);
 #endif

@@ -13,9 +13,6 @@ mv SDL2_image-2.0.3 SDL2_image
 rm SDL2_image-2.0.3.zip
 popd
 
-# Apply the changes to SDL package.
-cp patches/SDL_android.c external/SDL2/SDL2/src/core/android/
-
 pushd external
 wget https://github.com/native-toolkit/tinyfiledialogs/archive/master.zip
 unzip -q master.zip
