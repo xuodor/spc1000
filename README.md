@@ -52,7 +52,6 @@ sh build.sh
 - Solve known issues on Android:
   - Emulator doesn't work after resuming from background/device rotation
   - Make the emulator .INI file configurable (hard-coded now)
-  - Add launcher app icons
 
 ## Credits
 
@@ -60,3 +59,4 @@ sh build.sh
 - [https://github.com/pvallet/hello-sdl2-android](https://github.com/pvallet/hello-sdl2-android) Android SDL2 template
 - [https://github.com/mlabbe/nativefiledialog](https://github.com/mlabbe/nativefiledialog) Cross-platform file open/save dialog library
 - [https://github.com/RustamG/file-dialogs](https://github.com/RustamG/file-dialogs) Android file open/save dialog library
+- [http://www.old-computers.com/museum/computer.asp?st=1&c=803](http://www.old-computers.com/museum/computer.asp?st=1&c=803) Image used for the launcher icon
