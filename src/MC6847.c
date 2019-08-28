@@ -125,7 +125,8 @@ static void PutChar(int x, int y, int ascii, int attr) {
   unsigned char *pixels = (unsigned char *)surface->pixels;
   for (i = 0; i < 12; i++) {
     for (j = 0; j < 8; j++) {
-      PutCharPixel(j + x, y + i, fontData[i] & (0x80 >> j) ? fgColor : bgColor, screen);
+      PutCharPixel(j + x, y + i, fontData[i] & (0x80 >> j) ? fgColor : bgColor,
+                   screen);
     }
   }
 }
@@ -510,8 +511,7 @@ void InitMC6847(unsigned char *in_VRAM) {
   SDL_RenderSetLogicalSize(renderer, 512, 384);
 #endif
 
-  screen = SDL_CreateRGBSurfaceWithFormat(0, width, height, 24,
-                                          SDL_PIXELFORMAT_RGB888);
+  screen = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
   if (!screen) {
     SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
     exit(1);
