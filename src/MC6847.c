@@ -134,22 +134,23 @@ static void PutChar(int x, int y, int ascii, int attr) {
 void SetMidResBuf(unsigned char *addr, unsigned char data) {
   Uint32 *scrnColor = colorTbl[screenMode];
   Uint32 c = scrnColor[(0xc0 & data) >> 6];
-  for (int i = 0; i < 4; ++i) {
+  int i;
+  for (i = 0; i < 4; ++i) {
     PutSinglePixel(addr, c, screen);
     addr += bpp;
   }
   c = scrnColor[(0x30 & data) >> 4];
-  for (int i = 0; i < 4; ++i) {
+  for (i = 0; i < 4; ++i) {
     PutSinglePixel(addr, c, screen);
     addr += bpp;
   }
   c = scrnColor[(0x0c & data) >> 2];
-  for (int i = 0; i < 4; ++i) {
+  for (i = 0; i < 4; ++i) {
     PutSinglePixel(addr, c, screen);
     addr += bpp;
   }
   c = scrnColor[(0x03 & data)];
-  for (int i = 0; i < 4; ++i) {
+  for (i = 0; i < 4; ++i) {
     PutSinglePixel(addr, c, screen);
     addr += bpp;
   }
