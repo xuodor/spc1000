@@ -11,11 +11,11 @@ set(SOURCE_FILES \\
     ../src/spc1000_jni.c)
 
 set(SDL_LOCATION ${CMAKE_SOURCE_DIR}/../external/SDL2)
-add_library( SDL2 STATIC IMPORTED )
+add_library( SDL2 SHARED IMPORTED )
 
 set_target_properties(SDL2 PROPERTIES IMPORTED_LOCATION
 ${DISTRIBUTION_DIR}/${ANDROID_BUILD_DIR}/obj/local/${ANDROID_ABI}/libSDL2.so)
 
 include_directories(${SDL_LOCATION}/SDL2/include)
-add_library(main STATIC ${SOURCE_FILES} )
+add_library(main SHARED ${SOURCE_FILES} )
 target_link_libraries(main SDL2 log android)
