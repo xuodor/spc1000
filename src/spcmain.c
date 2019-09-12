@@ -165,6 +165,7 @@ void ReadINI(char *ini_data, int ini_len) {
   spcConfig.frameSkip = 0;
   spcConfig.casTurbo = 1;
   spcConfig.soundVol = 5;
+  spcConfig.scale = 1;
   spcConfig.keyLayout = 0;
   spcConfig.font = 0;
 
@@ -175,7 +176,7 @@ void ReadINI(char *ini_data, int ini_len) {
     offset = read_from_buf(ini_data, inputstr, offset);
 
     StripWS(inputstr);
-
+    printf("[%s]\n", inputstr);
     if (!strcmp("", inputstr) || inputstr[0] == '#')
       continue;
     if (!str1ncmp("COLORSET", inputstr)) {
@@ -220,6 +221,13 @@ void ReadINI(char *ini_data, int ini_len) {
         spcConfig.font = val;
       continue;
     }
+#if !defined(__ANDROID__)
+    if (!str1ncmp("SCALEFACTOR", inputstr)) {
+      val = GetVal(inputstr);
+      if (0 <= val && val <= 4) spcConfig.scale = val;
+      continue;
+    }
+#endif
     printf("The following line in the INI file is ignored:\n\t%s\n", inputstr);
   }
 }
@@ -709,7 +717,10 @@ void ProcessSpecialKey(SDLKey sym) {
     break;
 
   case SDLK_F11:
-    ResizeWindow();
+    // No scaling on Android.
+#if !defined(__ANDROID__)
+    ScaleWindow(-1);
+#endif
     break;
   case SDLK_F12: // Reset
     printf("Reset (keeping tape pos.)\n");
@@ -963,7 +974,8 @@ int main(int argc, char *argv[]) {
   if (spcConfig.keyLayout) setModernKeyLayout();
   InitIOSpace();
   ShowCredit();
-  InitMC6847(spc.IO.VRAM, spcConfig.font == 0 ? NULL : &spc.RAM[0x524A]);
+  InitMC6847(spc.IO.VRAM, spcConfig.scale,
+	     spcConfig.font == 0 ? NULL : &spc.RAM[0x524A]);
   SetMC6847Mode(SET_TEXTPAGE, 0); // set text page to 0
   OpenSoundDevice();
   BuildKeyHashTab(); // Init keyboard hash table

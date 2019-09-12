@@ -15,6 +15,7 @@ typedef struct
 	int frameSkip;
 	int casTurbo;
 	int soundVol;
+	int scale;
         int keyLayout;
         int font;
 } SPCConfig;

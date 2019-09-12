@@ -20,12 +20,9 @@ SDL_Texture *texture;
 SDL_Surface *surface_;
 
 int width_ = 512, height_ = 384;
-int scale_factor_ = 1;
 int is_fullscreen_ = 0;
 
 Uint8 bpp;
-Uint32 sbpp;  // scaled bpp
-Uint32 spitch;  // scaled pitch
 extern unsigned char CGROM[]; // CGROM, defined at the end of this file
 int sdlLockReq;
 int screenMode;
@@ -52,32 +49,29 @@ Uint32 colorMap[12]; // color value for the above color index
 unsigned char semiGrFont0[16 * 12]; // semigraphic pattern for mode 0
 unsigned char semiGrFont1[64 * 12]; // semigraphic pattern for mode 1
 
+#if defined(__ANDROID__)
+void InitWindow();
+#endif
+
 byte *offset(int x, int y) {
   // Pitch doubled to take the scan line into account.
-  return (byte *)surface_->pixels + 2 * (spitch * y + sbpp * x);
+  return (byte *)surface_->pixels + 2 * (surface_->pitch * y + bpp * x);
 }
 
-// Single dot consists of scale_factor_ * scale_factor_ pixels
 void DrawSingleDot(unsigned char *addr, Uint32 c, SDL_Surface *surface) {
-  int k, i;
   SDL_PixelFormat *fmt = surface->format;
-  for (k = 0; k < scale_factor_; ++k) {
-    byte *p = addr;
-    for (i = 0; i < scale_factor_; ++i, p += bpp) {
-      // Why should the RGB order be reversed to get the right colors?
-      p[0] = ((c & fmt->Bmask) >> fmt->Bshift) << fmt->Bloss;
-      p[1] = ((c & fmt->Gmask) >> fmt->Gshift) << fmt->Gloss;
-      p[2] = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
-    }
-    addr += spitch;
-  }
+  byte *p = addr;
+  // Why should the RGB order be reversed to get the right colors?
+  p[0] = ((c & fmt->Bmask) >> fmt->Bshift) << fmt->Bloss;
+  p[1] = ((c & fmt->Gmask) >> fmt->Gshift) << fmt->Gloss;
+  p[2] = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
 }
 
 // Single char dot consists of 2 consecutive dots.
 void DrawCharDot(int x, int y, Uint32 c, SDL_Surface *surface) {
   byte *addr = offset(x, y);
   DrawSingleDot(addr       , c, surface);
-  DrawSingleDot(addr + sbpp, c, surface);
+  DrawSingleDot(addr + bpp, c, surface);
 }
 
 /**
@@ -153,22 +147,22 @@ void SetMidResBuf(unsigned char *addr, unsigned char data) {
   int i;
   for (i = 0; i < 4; ++i) {
     DrawSingleDot(addr, c, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
   c = scrnColor[(0x30 & data) >> 4];
   for (i = 0; i < 4; ++i) {
     DrawSingleDot(addr, c, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
   c = scrnColor[(0x0c & data) >> 2];
   for (i = 0; i < 4; ++i) {
     DrawSingleDot(addr, c, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
   c = scrnColor[(0x03 & data)];
   for (i = 0; i < 4; ++i) {
     DrawSingleDot(addr, c, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
 }
 
@@ -186,8 +180,9 @@ static void PutMidGr(int pos, unsigned char data) {
   x = (pos % 32) * 8;
   y = pos / 32;
   byte *addr = offset(x, y);
-  SetMidResBuf(addr,          data);
-  SetMidResBuf(addr + spitch, data);
+  SetMidResBuf(addr, data);
+  addr += surface_->pitch;
+  SetMidResBuf(addr, data);
 }
 
 /**
@@ -210,15 +205,15 @@ static void PutHiGr(int pos, unsigned char data) {
   base = addr = offset(x, y);
   for (i = 0; i < 16; i++) {
     DrawSingleDot(addr, bgColor, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
   addr = base;
   for (i = 0; i < 8; i++) {
     Uint32 color = (data & (0x80 >> i)) ? fgColor : bgColor;
     DrawSingleDot(addr, color, surface_);
-    addr += sbpp;
+    addr += bpp;
     DrawSingleDot(addr, color, surface_);
-    addr += sbpp;
+    addr += bpp;
   }
 }
 
@@ -278,10 +273,10 @@ void UpdateMC6847Text(int changeLoc) {
     UpdateRect(surface_, 0, 0, width_, height_);
   } else {
     UpdateRect(surface_,
-	       scale_factor_ * x * 8 * 2,
-	       scale_factor_ * y * 12 * 2,
-	       scale_factor_ * 16,
-	       scale_factor_ * 24);
+	       x * 8 * 2,
+	       y * 12 * 2,
+	       16,
+	       24);
   }
 }
 
@@ -315,10 +310,10 @@ void UpdateMC6847Gr(int pos) {
 
   if (pos != MC6847_UPDATEALL)
     UpdateRect(surface_,
-	       scale_factor_ * (pos % 32) * 8 * 2,
-	       scale_factor_ * (pos / 32) * 2,
-	       scale_factor_ * 16,
-	       scale_factor_ * 2);
+	       (pos % 32) * 8 * 2,
+	       (pos / 32) * 2,
+	       16,
+	       2);
   else
     UpdateRect(surface_, 0, 0, width_, height_);
 }
@@ -481,9 +476,10 @@ void MC6847ColorMode(int colorMode) {
 /**
  * Initialize 6847 mode, SDL screen, and semigraphic pattern
  * @param in_VRAM pointer to VRAM array, must be preapred by caller
+ * @param scale Screen scale factor. 0 if fullscreen
  * @param cgbuf (0x524A system RAM) containing 8x12 character data
  */
-void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
+void InitMC6847(byte *in_VRAM, int scale, byte *cgbuf) {
   int i, j;
   
   VRAM = in_VRAM;
@@ -517,28 +513,18 @@ void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
     exit(1);
   }
 
-// Scales the display to fit the entire device screen.
-#if defined(__ANDROID__)
+  // Scales the display to fit the window which can be resized programmatically.
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
   SDL_RenderSetLogicalSize(renderer, 512, 384);
+
+#if defined(__ANDROID__)
+  InitWindow();
+#else
+  ScaleWindow(scale);
 #endif
-
-  surface_ = SDL_CreateRGBSurface(0, width_, height_, 32, 0, 0, 0, 0);
-  if (!surface_) {
-    SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
-    exit(1);
-  }
-
-  texture = SDL_CreateTextureFromSurface(renderer, surface_);
-  if (!texture) {
-    SDL_Log("Unable to init texture: %s\n", SDL_GetError());
-    exit(1);
-  }
 
   atexit(SDL_Quit);
   bpp = surface_->format->BytesPerPixel;
-  sbpp = bpp * scale_factor_;
-  spitch = surface_->pitch * scale_factor_;
   MC6847ColorMode(spcConfig.colorMode);
 
   // initialize semigraphic pattern
@@ -584,42 +570,74 @@ void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
   sdlLockReq = SDL_MUSTLOCK(surface_);
 }
 
-void ResizeWindow() {
-  SDL_DisplayMode mode;
-  SDL_GetCurrentDisplayMode(0, &mode);
-  if (is_fullscreen_) {
-    SDL_SetWindowFullscreen(window, 0);
-    width_ = 512;
-    height_ = 384;
-    scale_factor_ = 1;
-    SDL_SetWindowSize(window, width_, height_);
-    is_fullscreen_ = 0;
-  } else {
-    if (width_ * 2 > mode.w || height_ * 2 > mode.h) {
-      SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-      is_fullscreen_ = 1;
-    } else {
-      width_ *= 2;
-      height_ *= 2;
-      scale_factor_ *= 2;
-      SDL_SetWindowSize(window, width_, height_);
-    }
-  }
-  SDL_FreeSurface(surface_);
+/**
+ * Init window
+ */
+void InitWindow() {
+  SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
   surface_ = SDL_CreateRGBSurface(0, width_, height_, 32, 0, 0, 0, 0);
   if (!surface_) {
     SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
     exit(1);
   }
-
-  SDL_DestroyTexture(texture);
   texture = SDL_CreateTextureFromSurface(renderer, surface_);
   if (!texture) {
     SDL_Log("Unable to init texture: %s\n", SDL_GetError());
     exit(1);
   }
-  sbpp = bpp * scale_factor_;
-  spitch = surface_->pitch * scale_factor_;
+  SDL_RenderClear(renderer);
+  UpdateRect(surface_, 0, 0, width_, height_);
+}
+
+/**
+ * Scale window
+ * @param scale Scale factor. 0 for fullscreen.
+ *         -1 for scaling up the current size by 2
+ */
+void ScaleWindow(int scale) {
+  static int current_scale_ = 1;
+
+  if (!scale && is_fullscreen_) return;
+
+  do {
+    if (is_fullscreen_ || (!surface_ && !texture)) {
+      // Set to default 512x384 if we were in fullscreen or first-time init.
+      SDL_SetWindowFullscreen(window, 0);
+      width_ = 512;
+      height_ = 384;
+      SDL_SetWindowSize(window, width_, height_);
+      is_fullscreen_ = 0;
+      current_scale_ = 1;
+    } else {
+      // Turn to fullscreen if can't make bigger.
+      SDL_DisplayMode mode;
+      SDL_GetCurrentDisplayMode(0, &mode);
+      if (width_ * 2 > mode.w || height_ * 2 > mode.h) {
+	SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	is_fullscreen_ = 1;
+	scale = current_scale_ = 0;
+      } else {
+	width_ *= 2;
+	height_ *= 2;
+	current_scale_++;
+	SDL_SetWindowSize(window, width_, height_);
+      }
+    }
+    if (surface_) SDL_FreeSurface(surface_);
+    surface_ = SDL_CreateRGBSurface(0, width_, height_, 32, 0, 0, 0, 0);
+    if (!surface_) {
+      SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
+      exit(1);
+    }
+    if (texture) SDL_DestroyTexture(texture);
+    texture = SDL_CreateTextureFromSurface(renderer, surface_);
+    if (!texture) {
+      SDL_Log("Unable to init texture: %s\n", SDL_GetError());
+      exit(1);
+    }
+    if ((is_fullscreen_ && scale == 0) || scale < 0) break;
+  } while (scale != current_scale_);
+  SDL_RenderClear(renderer);
   UpdateRect(surface_, 0, 0, width_, height_);
 }
 
