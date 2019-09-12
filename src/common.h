@@ -8,13 +8,15 @@
 #ifndef __SPC_COMMON_H__
 #define __SPC_COMMON_H__
 
-typedef struct 
+typedef struct
 {
-	int colorMode;
-	int scanLine;
-	int frameSkip;
-	int casTurbo;
-	int soundVol;
+  int colorMode;
+  int scanLine;
+  int frameSkip;
+  int casTurbo;
+  int soundVol;
+  int keyLayout;
+  int font;
 } SPCConfig;
 
 #define SPCCOL_OLDREV		0

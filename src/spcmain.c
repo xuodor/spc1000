@@ -165,6 +165,8 @@ void ReadINI(char *ini_data, int ini_len) {
   spcConfig.frameSkip = 0;
   spcConfig.casTurbo = 1;
   spcConfig.soundVol = 5;
+  spcConfig.keyLayout = 0;
+  spcConfig.font = 0;
 
   int offset = 0;
   while (offset < ini_len) {
@@ -204,6 +206,18 @@ void ReadINI(char *ini_data, int ini_len) {
       val = GetVal(inputstr);
       if (val >= 0 && val <= 40)
         spcConfig.soundVol = val;
+      continue;
+    }
+    if (!str1ncmp("KEYLAYOUT", inputstr)) {
+      val = GetVal(inputstr);
+      if (val == 0 || val == 1)
+        spcConfig.keyLayout = val;
+      continue;
+    }
+    if (!str1ncmp("FONTDATA", inputstr)) {
+      val = GetVal(inputstr);
+      if (val == 0 || val == 1)
+        spcConfig.font = val;
       continue;
     }
     printf("The following line in the INI file is ignored:\n\t%s\n", inputstr);
@@ -694,26 +708,6 @@ void ProcessSpecialKey(SDLKey sym) {
     printf("Image Load\n");
     break;
 
-  case SDLK_F11: // PC Keyboard mode, thanks to zanny
-    printf("PC keyboard mode\n");
-    spc.RAM[0x1311] = 0x27; // 3b '(AT), :(SPC)
-    spc.RAM[0x1320] = 0x3d;
-    spc.RAM[0x1331] = 0x7c;
-    spc.RAM[0x1341] = 0x5d;
-    spc.RAM[0x1346] = 0x60;
-    spc.RAM[0x1350] = 0x7f;
-    spc.RAM[0x1351] = 0x29;
-    spc.RAM[0x1352] = 0x3a; // 22 :(AT), +(SPC)
-    spc.RAM[0x1355] = 0x28;
-    spc.RAM[0x1359] = 0x22; // 3a "(AT), *(SPC)
-    spc.RAM[0x135d] = 0x2a;
-    spc.RAM[0x1365] = 0x26;
-    spc.RAM[0x1368] = 0x2b;
-    spc.RAM[0x136d] = 0x5e; // 53
-    spc.RAM[0x1379] = 0x5c;
-    spc.RAM[0x138d] = 0x40;
-    spc.RAM[0x138e] = 0x7e;
-    break;
   case SDLK_F12: // Reset
     printf("Reset (keeping tape pos.)\n");
     rfp_save = spc.IO.cas.rfp;
@@ -869,6 +863,26 @@ byte InZ80(register word Port) {
   return 0;
 }
 
+void setModernKeyLayout() {
+    spc.ROM[0x1311] = 0x27; // 3b '(AT), :(SPC)
+    spc.ROM[0x1320] = 0x3d;
+    spc.ROM[0x1331] = 0x7c;
+    spc.ROM[0x1341] = 0x5d;
+    spc.ROM[0x1346] = 0x60;
+    spc.ROM[0x1350] = 0x7f;
+    spc.ROM[0x1351] = 0x29;
+    spc.ROM[0x1352] = 0x3a; // 22 :(AT), +(SPC)
+    spc.ROM[0x1355] = 0x28;
+    spc.ROM[0x1359] = 0x22; // 3a "(AT), *(SPC)
+    spc.ROM[0x135d] = 0x2a;
+    spc.ROM[0x1365] = 0x26;
+    spc.ROM[0x1368] = 0x2b;
+    spc.ROM[0x136d] = 0x5e; // 53
+    spc.ROM[0x1379] = 0x5c;
+    spc.ROM[0x138d] = 0x40;
+    spc.ROM[0x138e] = 0x7e;
+}
+
 /*************************************************************/
 /** Misc. Callback Functions                                **/
 /*************************************************************/
@@ -893,7 +907,7 @@ void ShowCredit(void) {
   printf("F8 : cassette PLAY button\n");
   printf("F9 : cassette REC button\n");
   printf("F10: cassette STOP button\n");
-  printf("F11: PC-compatible keyboard layout (IOCS change, by zanny)\n");
+  printf("F11: Change screen size (not working yet)\n");
   printf("F12: Reset (keeping tape position)\n");
   printf("Scroll Lock: Turbo mode\n");
   printf("TAB: LOCK key\n");
@@ -943,9 +957,10 @@ int main(int argc, char *argv[]) {
   fclose(fp);
 #endif
 
+  if (spcConfig.keyLayout) setModernKeyLayout();
   InitIOSpace();
   ShowCredit();
-  InitMC6847(spc.IO.VRAM); // Tells VRAM address to MC6847 module and init
+  InitMC6847(spc.IO.VRAM, spcConfig.font == 0 ? NULL : &spc.RAM[0x524A]);
   SetMC6847Mode(SET_TEXTPAGE, 0); // set text page to 0
   OpenSoundDevice();
   BuildKeyHashTab(); // Init keyboard hash table

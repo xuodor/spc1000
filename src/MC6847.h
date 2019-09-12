@@ -15,8 +15,9 @@
 void UpdateMC6847Text(int changLoc);
 void UpdateMC6847Gr(int port);
 int SetMC6847Mode(int command, int param);
-void InitMC6847(unsigned char* in_VRAM);
+void InitMC6847(unsigned char* in_VRAM, unsigned char* cgbuf);
 void CloseMC6847(void);
 void SDLWaitQuit(void);
+void ResizeWindow(void);
 
 #endif // __MC6847_H__

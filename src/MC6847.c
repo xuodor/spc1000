@@ -10,6 +10,7 @@
 
 static unsigned char
     *VRAM;           // VRAM pointer. Real storage is located in spcmain.c
+static unsigned char *FONT_BUF_;
 int currentPage = 0; // current text page
 int XWidth = 0;      // stride for Y+1
 
@@ -116,8 +117,9 @@ static void PutChar(int x, int y, int ascii, int attr) {
       fontData = &(VRAM[0x1600 + (ascii - 96) * 16]);
     else if (ascii >= 128 && ascii < 224)
       fontData = &(VRAM[0x1000 + (ascii - 128) * 16]);
-    else
-      fontData = &(CGROM[(ascii - 32) * 12]); // 12 bytes
+    else {
+      fontData = FONT_BUF_ + (ascii - 32) * 12;  // 8x12
+    }
   }
 
   SDL_Surface *surface = screen;
@@ -471,13 +473,15 @@ void MC6847ColorMode(int colorMode) {
 /**
  * Initialize 6847 mode, SDL screen, and semigraphic pattern
  * @param in_VRAM pointer to VRAM array, must be preapred by caller
+ * @param cgbuf (0x524A system RAM) containing 8x12 character data
  */
-void InitMC6847(unsigned char *in_VRAM) {
+void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
   int i, j;
   int width = 512;
   int height = 384;
 
   VRAM = in_VRAM;
+  FONT_BUF_ = cgbuf ? cgbuf : CGROM;
 
   if ((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1)) {
     printf("Could not initialize SDL: %s.\n", SDL_GetError());
