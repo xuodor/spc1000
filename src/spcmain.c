@@ -708,6 +708,9 @@ void ProcessSpecialKey(SDLKey sym) {
     printf("Image Load\n");
     break;
 
+  case SDLK_F11:
+    ResizeWindow();
+    break;
   case SDLK_F12: // Reset
     printf("Reset (keeping tape pos.)\n");
     rfp_save = spc.IO.cas.rfp;
@@ -907,7 +910,7 @@ void ShowCredit(void) {
   printf("F8 : cassette PLAY button\n");
   printf("F9 : cassette REC button\n");
   printf("F10: cassette STOP button\n");
-  printf("F11: Change screen size (not working yet)\n");
+  printf("F11: Change screen size\n");
   printf("F12: Reset (keeping tape position)\n");
   printf("Scroll Lock: Turbo mode\n");
   printf("TAB: LOCK key\n");

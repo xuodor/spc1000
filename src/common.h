@@ -10,13 +10,13 @@
 
 typedef struct
 {
-  int colorMode;
-  int scanLine;
-  int frameSkip;
-  int casTurbo;
-  int soundVol;
-  int keyLayout;
-  int font;
+	int colorMode;
+	int scanLine;
+	int frameSkip;
+	int casTurbo;
+	int soundVol;
+        int keyLayout;
+        int font;
 } SPCConfig;
 
 #define SPCCOL_OLDREV		0

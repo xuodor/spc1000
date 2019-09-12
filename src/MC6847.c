@@ -8,19 +8,24 @@
 #include "MC6847.h"
 #include "common.h"
 
-static unsigned char
-    *VRAM;           // VRAM pointer. Real storage is located in spcmain.c
-static unsigned char *FONT_BUF_;
+typedef unsigned char byte;
+
+static byte *VRAM;
+static byte *FONT_BUF_;
 int currentPage = 0; // current text page
-int XWidth = 0;      // stride for Y+1
 
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *texture;
-SDL_Surface *screen;
+SDL_Surface *surface_;
 
-Uint8 *frameBuf;
+int width_ = 512, height_ = 384;
+int scale_factor_ = 1;
+int is_fullscreen_ = 0;
+
 Uint8 bpp;
+Uint32 sbpp;  // scaled bpp
+Uint32 spitch;  // scaled pitch
 extern unsigned char CGROM[]; // CGROM, defined at the end of this file
 int sdlLockReq;
 int screenMode;
@@ -47,20 +52,32 @@ Uint32 colorMap[12]; // color value for the above color index
 unsigned char semiGrFont0[16 * 12]; // semigraphic pattern for mode 0
 unsigned char semiGrFont1[64 * 12]; // semigraphic pattern for mode 1
 
-void PutSinglePixel(unsigned char *addr, Uint32 c, SDL_Surface *surface) {
-  SDL_PixelFormat *fmt = surface->format;
-  // Why should the RGB order be reversed to get the right colors?
-  *addr++ = ((c & fmt->Bmask) >> fmt->Bshift) << fmt->Bloss;
-  *addr++ = ((c & fmt->Gmask) >> fmt->Gshift) << fmt->Gloss;
-  *addr++ = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
+byte *offset(int x, int y) {
+  // Pitch doubled to take the scan line into account.
+  return (byte *)surface_->pixels + 2 * (spitch * y + sbpp * x);
 }
 
-void PutCharPixel(int x, int y, Uint32 c, SDL_Surface *surface) {
-  // Pitch doubled to take the scan line into account.
-  unsigned int offset = surface->pitch * 2 * y + x * bpp * 2;
-  unsigned char *pixels = (unsigned char *)surface->pixels;
-  PutSinglePixel(pixels + offset, c, surface);
-  PutSinglePixel(pixels + offset + bpp, c, surface);
+// Single dot consists of scale_factor_ * scale_factor_ pixels
+void DrawSingleDot(unsigned char *addr, Uint32 c, SDL_Surface *surface) {
+  int k, i;
+  SDL_PixelFormat *fmt = surface->format;
+  for (k = 0; k < scale_factor_; ++k) {
+    byte *p = addr;
+    for (i = 0; i < scale_factor_; ++i, p += bpp) {
+      // Why should the RGB order be reversed to get the right colors?
+      p[0] = ((c & fmt->Bmask) >> fmt->Bshift) << fmt->Bloss;
+      p[1] = ((c & fmt->Gmask) >> fmt->Gshift) << fmt->Gloss;
+      p[2] = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
+    }
+    addr += spitch;
+  }
+}
+
+// Single char dot consists of 2 consecutive dots.
+void DrawCharDot(int x, int y, Uint32 c, SDL_Surface *surface) {
+  byte *addr = offset(x, y);
+  DrawSingleDot(addr       , c, surface);
+  DrawSingleDot(addr + sbpp, c, surface);
 }
 
 /**
@@ -76,8 +93,8 @@ static void PutChar(int x, int y, int ascii, int attr) {
   Uint32 fgColor;
   Uint32 bgColor;
 
-  if (attr & 0x04) // semigrahpic
-  {
+  if (attr & 0x04) {
+    // semigrahpic
     bgColor = semiColorTbl[0];
     switch (attr & 0x08) {
     case 0:
@@ -113,22 +130,19 @@ static void PutChar(int x, int y, int ascii, int attr) {
       ascii = 32;
     if ((attr & 0x08) && (ascii < 96))
       ascii += 128;
-    if (ascii >= 96 && ascii < 128)
+    if (96 <= ascii && ascii < 128)
       fontData = &(VRAM[0x1600 + (ascii - 96) * 16]);
-    else if (ascii >= 128 && ascii < 224)
+    else if (128 <= ascii && ascii < 224)
       fontData = &(VRAM[0x1000 + (ascii - 128) * 16]);
     else {
       fontData = FONT_BUF_ + (ascii - 32) * 12;  // 8x12
     }
   }
 
-  SDL_Surface *surface = screen;
-  unsigned int offset = XWidth * y + x * bpp * 2;
-  unsigned char *pixels = (unsigned char *)surface->pixels;
   for (i = 0; i < 12; i++) {
     for (j = 0; j < 8; j++) {
-      PutCharPixel(j + x, y + i, fontData[i] & (0x80 >> j) ? fgColor : bgColor,
-                   screen);
+      int color = fontData[i] & (0x80 >> j) ? fgColor : bgColor;
+      DrawCharDot(j + x, y + i, color, surface_);
     }
   }
 }
@@ -138,23 +152,23 @@ void SetMidResBuf(unsigned char *addr, unsigned char data) {
   Uint32 c = scrnColor[(0xc0 & data) >> 6];
   int i;
   for (i = 0; i < 4; ++i) {
-    PutSinglePixel(addr, c, screen);
-    addr += bpp;
+    DrawSingleDot(addr, c, surface_);
+    addr += sbpp;
   }
   c = scrnColor[(0x30 & data) >> 4];
   for (i = 0; i < 4; ++i) {
-    PutSinglePixel(addr, c, screen);
-    addr += bpp;
+    DrawSingleDot(addr, c, surface_);
+    addr += sbpp;
   }
   c = scrnColor[(0x0c & data) >> 2];
   for (i = 0; i < 4; ++i) {
-    PutSinglePixel(addr, c, screen);
-    addr += bpp;
+    DrawSingleDot(addr, c, surface_);
+    addr += sbpp;
   }
   c = scrnColor[(0x03 & data)];
   for (i = 0; i < 4; ++i) {
-    PutSinglePixel(addr, c, screen);
-    addr += bpp;
+    DrawSingleDot(addr, c, surface_);
+    addr += sbpp;
   }
 }
 
@@ -166,19 +180,14 @@ void SetMidResBuf(unsigned char *addr, unsigned char data) {
 static void PutMidGr(int pos, unsigned char data) {
   int x, y;
 
-  Uint32 *scrnColor;
-  scrnColor = colorTbl[screenMode];
-
   if (pos < 0 || pos >= 6144)
     return;
 
   x = (pos % 32) * 8;
   y = pos / 32;
-
-  Uint8 *bufp = (Uint8 *)(frameBuf + (y * XWidth) + x * 2 * bpp);
-  SetMidResBuf(bufp, data);
-  bufp += screen->pitch;
-  SetMidResBuf(bufp, data);
+  byte *addr = offset(x, y);
+  SetMidResBuf(addr,          data);
+  SetMidResBuf(addr + spitch, data);
 }
 
 /**
@@ -187,48 +196,39 @@ static void PutMidGr(int pos, unsigned char data) {
  * @param data a byte data to be put
  */
 static void PutHiGr(int pos, unsigned char data) {
-
   int i;
   int x, y;
-
   Uint32 fgColor = colorTbl[screenMode][1];
   Uint32 bgColor = colorTbl[screenMode][0];
-
+  byte *base, *addr;
+  
   if (pos < 0 || pos >= 6144)
     return;
   x = (pos % 32) * 8;
   y = pos / 32;
 
-  unsigned int offset = XWidth * y + x * bpp * 2;
-  unsigned char *pixels = (unsigned char *)screen->pixels;
-  unsigned char *addr = pixels + offset;
-
+  base = addr = offset(x, y);
   for (i = 0; i < 16; i++) {
-    PutSinglePixel(addr, bgColor, screen);
-    addr += bpp;
+    DrawSingleDot(addr, bgColor, surface_);
+    addr += sbpp;
   }
-  addr = pixels + offset;
+  addr = base;
   for (i = 0; i < 8; i++) {
-    if (data & (0x80 >> i)) {
-      PutSinglePixel(addr, fgColor, screen);
-      addr += bpp;
-      PutSinglePixel(addr, fgColor, screen);
-    } else {
-      PutSinglePixel(addr, bgColor, screen);
-      addr += bpp;
-      PutSinglePixel(addr, bgColor, screen);
-    }
-    addr += bpp;
+    Uint32 color = (data & (0x80 >> i)) ? fgColor : bgColor;
+    DrawSingleDot(addr, color, surface_);
+    addr += sbpp;
+    DrawSingleDot(addr, color, surface_);
+    addr += sbpp;
   }
 }
 
-void UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
+void UpdateRect(SDL_Surface *surface, Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
   SDL_Rect r;
   r.x = x;
   r.y = y;
   r.w = w;
   r.h = h;
-  SDL_UpdateTexture(texture, NULL, screen->pixels, screen->pitch);
+  SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
   SDL_RenderCopy(renderer, texture, NULL, &r);
   SDL_RenderPresent(renderer);
 }
@@ -253,7 +253,7 @@ void UpdateMC6847Text(int changeLoc) {
   }
 
   if (sdlLockReq)
-    if (SDL_LockSurface(screen) < 0)
+    if (SDL_LockSurface(surface_) < 0)
       return;
 
   if (changeLoc == MC6847_UPDATEALL) {
@@ -272,12 +272,16 @@ void UpdateMC6847Text(int changeLoc) {
   }
 
   if (sdlLockReq)
-    SDL_UnlockSurface(screen);
+    SDL_UnlockSurface(surface_);
 
   if (changeLoc == MC6847_UPDATEALL) {
-    UpdateRect(screen, 0, 0, 512, 384);
+    UpdateRect(surface_, 0, 0, width_, height_);
   } else {
-    UpdateRect(screen, x * 8 * 2, y * 12 * 2, 16, 24);
+    UpdateRect(surface_,
+	       scale_factor_ * x * 8 * 2,
+	       scale_factor_ * y * 12 * 2,
+	       scale_factor_ * 16,
+	       scale_factor_ * 24);
   }
 }
 
@@ -290,7 +294,7 @@ void UpdateMC6847Gr(int pos) {
   int i;
 
   if (sdlLockReq)
-    if (SDL_LockSurface(screen) < 0)
+    if (SDL_LockSurface(surface_) < 0)
       return;
 
   if (pos != MC6847_UPDATEALL) {
@@ -307,12 +311,16 @@ void UpdateMC6847Gr(int pos) {
   }
 
   if (sdlLockReq)
-    SDL_UnlockSurface(screen);
+    SDL_UnlockSurface(surface_);
 
   if (pos != MC6847_UPDATEALL)
-    UpdateRect(screen, (pos % 32) * 8 * 2, (pos / 32) * 2, 16, 2);
+    UpdateRect(surface_,
+	       scale_factor_ * (pos % 32) * 8 * 2,
+	       scale_factor_ * (pos / 32) * 2,
+	       scale_factor_ * 16,
+	       scale_factor_ * 2);
   else
-    UpdateRect(screen, 0, 0, 512, 384);
+    UpdateRect(surface_, 0, 0, width_, height_);
 }
 
 /**
@@ -323,13 +331,13 @@ void UpdateMC6847Gr(int pos) {
  */
 int SetMC6847Mode(int command, int param) {
   SDL_Rect video_rect;
-  Uint32 bgColor = SDL_MapRGB(screen->format, 0, 0, 0);
+  Uint32 bgColor = SDL_MapRGB(surface_->format, 0, 0, 0);
   int prevScreenMode;
 
   video_rect.x = 0;
   video_rect.y = 0;
-  video_rect.w = 512;
-  video_rect.h = 192 * 2;
+  video_rect.w = width_;
+  video_rect.h = height_;
 
   prevScreenMode = screenMode;
   switch (command) {
@@ -365,12 +373,12 @@ int SetMC6847Mode(int command, int param) {
     currentPage = (param & 0x30) >> 4;
     screenMode = 0;
     if (sdlLockReq)
-      if (SDL_LockSurface(screen) < 0)
+      if (SDL_LockSurface(surface_) < 0)
         return -1;
-    SDL_FillRect(screen, &video_rect, bgColor);
+    SDL_FillRect(surface_, &video_rect, bgColor);
     if (sdlLockReq)
-      SDL_UnlockSurface(screen);
-    UpdateRect(screen, 0, 0, 512, 384);
+      SDL_UnlockSurface(surface_);
+    UpdateRect(surface_, 0, 0, width_, height_);
     break;
   }
 
@@ -385,33 +393,33 @@ int greenMode = 0;
  */
 void MC6847ColorMode(int colorMode) {
   if (colorMode == SPCCOL_GREEN) {
-    colorMap[COLOR_BLACK] = SDL_MapRGB(screen->format, 0, 0, 0);
-    colorMap[COLOR_GREEN] = SDL_MapRGB(screen->format, 0, 255, 0);
-    colorMap[COLOR_YELLOW] = SDL_MapRGB(screen->format, 32, 255, 32);
-    colorMap[COLOR_BLUE] = SDL_MapRGB(screen->format, 0, 32, 0);
-    colorMap[COLOR_RED] = SDL_MapRGB(screen->format, 0, 100, 0);
-    colorMap[COLOR_BUFF] = SDL_MapRGB(screen->format, 0, 24, 0);
-    colorMap[COLOR_CYAN] = SDL_MapRGB(screen->format, 0, 224, 0);
-    colorMap[COLOR_MAGENTA] = SDL_MapRGB(screen->format, 0, 128, 0);
-    colorMap[COLOR_ORANGE] = SDL_MapRGB(screen->format, 0, 224, 0);
+    colorMap[COLOR_BLACK] = SDL_MapRGB(surface_->format, 0, 0, 0);
+    colorMap[COLOR_GREEN] = SDL_MapRGB(surface_->format, 0, 255, 0);
+    colorMap[COLOR_YELLOW] = SDL_MapRGB(surface_->format, 32, 255, 32);
+    colorMap[COLOR_BLUE] = SDL_MapRGB(surface_->format, 0, 32, 0);
+    colorMap[COLOR_RED] = SDL_MapRGB(surface_->format, 0, 100, 0);
+    colorMap[COLOR_BUFF] = SDL_MapRGB(surface_->format, 0, 24, 0);
+    colorMap[COLOR_CYAN] = SDL_MapRGB(surface_->format, 0, 224, 0);
+    colorMap[COLOR_MAGENTA] = SDL_MapRGB(surface_->format, 0, 128, 0);
+    colorMap[COLOR_ORANGE] = SDL_MapRGB(surface_->format, 0, 224, 0);
     colorMap[COLOR_CYANBLUE] =
-        SDL_MapRGB(screen->format, 0, 200, 0); // CYAN/BLUE?
-    colorMap[COLOR_LGREEN] = SDL_MapRGB(screen->format, 32, 255, 32);
+        SDL_MapRGB(surface_->format, 0, 200, 0); // CYAN/BLUE?
+    colorMap[COLOR_LGREEN] = SDL_MapRGB(surface_->format, 32, 255, 32);
     colorMap[COLOR_DGREEN] =
-        SDL_MapRGB(screen->format, 0, 192, 0); // for screen 2
+        SDL_MapRGB(surface_->format, 0, 192, 0); // for screen 2
   } else {
-    colorMap[COLOR_BLACK] = SDL_MapRGB(screen->format, 0, 0, 0);
-    colorMap[COLOR_GREEN] = SDL_MapRGB(screen->format, 0, 255, 0);
-    colorMap[COLOR_YELLOW] = SDL_MapRGB(screen->format, 255, 255, 192);
-    colorMap[COLOR_BLUE] = SDL_MapRGB(screen->format, 0, 0, 255);
-    colorMap[COLOR_RED] = SDL_MapRGB(screen->format, 255, 0, 0);
-    colorMap[COLOR_BUFF] = SDL_MapRGB(screen->format, 96, 0, 0);
-    colorMap[COLOR_CYAN] = SDL_MapRGB(screen->format, 0, 255, 255);
-    colorMap[COLOR_MAGENTA] = SDL_MapRGB(screen->format, 255, 0, 255);
-    colorMap[COLOR_ORANGE] = SDL_MapRGB(screen->format, 255, 128, 0);
+    colorMap[COLOR_BLACK] = SDL_MapRGB(surface_->format, 0, 0, 0);
+    colorMap[COLOR_GREEN] = SDL_MapRGB(surface_->format, 0, 255, 0);
+    colorMap[COLOR_YELLOW] = SDL_MapRGB(surface_->format, 255, 255, 192);
+    colorMap[COLOR_BLUE] = SDL_MapRGB(surface_->format, 0, 0, 255);
+    colorMap[COLOR_RED] = SDL_MapRGB(surface_->format, 255, 0, 0);
+    colorMap[COLOR_BUFF] = SDL_MapRGB(surface_->format, 96, 0, 0);
+    colorMap[COLOR_CYAN] = SDL_MapRGB(surface_->format, 0, 255, 255);
+    colorMap[COLOR_MAGENTA] = SDL_MapRGB(surface_->format, 255, 0, 255);
+    colorMap[COLOR_ORANGE] = SDL_MapRGB(surface_->format, 255, 128, 0);
     colorMap[COLOR_CYANBLUE] =
-        SDL_MapRGB(screen->format, 0, 128, 255); // CYAN/BLUE?
-    colorMap[COLOR_LGREEN] = SDL_MapRGB(screen->format, 64, 255, 64);
+        SDL_MapRGB(surface_->format, 0, 128, 255); // CYAN/BLUE?
+    colorMap[COLOR_LGREEN] = SDL_MapRGB(surface_->format, 64, 255, 64);
   }
 
   // Semi Graphic
@@ -477,9 +485,7 @@ void MC6847ColorMode(int colorMode) {
  */
 void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
   int i, j;
-  int width = 512;
-  int height = 384;
-
+  
   VRAM = in_VRAM;
   FONT_BUF_ = cgbuf ? cgbuf : CGROM;
 
@@ -489,10 +495,11 @@ void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
   }
 
   Uint32 wflags = SDL_WINDOW_OPENGL;
-  int wwidth = width;
-  int wheight = height;
+  int wwidth = width_;
+  int wheight = height_;
 
 #if defined(__ANDROID__)
+  // Always use fullscreen on Android.
   wflags |= SDL_WINDOW_FULLSCREEN;
   wwidth = 0;
   wheight = 0;
@@ -516,23 +523,22 @@ void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
   SDL_RenderSetLogicalSize(renderer, 512, 384);
 #endif
 
-  screen = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
-  if (!screen) {
+  surface_ = SDL_CreateRGBSurface(0, width_, height_, 32, 0, 0, 0, 0);
+  if (!surface_) {
     SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
     exit(1);
   }
 
-  texture = SDL_CreateTextureFromSurface(renderer, screen);
+  texture = SDL_CreateTextureFromSurface(renderer, surface_);
   if (!texture) {
     SDL_Log("Unable to init texture: %s\n", SDL_GetError());
     exit(1);
   }
 
   atexit(SDL_Quit);
-  bpp = screen->format->BytesPerPixel;
-  XWidth = bpp * width * 2; // (2)scanline
-
-  frameBuf = (Uint8 *)screen->pixels;
+  bpp = surface_->format->BytesPerPixel;
+  sbpp = bpp * scale_factor_;
+  spitch = surface_->pitch * scale_factor_;
   MC6847ColorMode(spcConfig.colorMode);
 
   // initialize semigraphic pattern
@@ -575,7 +581,46 @@ void InitMC6847(unsigned char *in_VRAM, unsigned char *cgbuf) {
       semiGrFont1[i * 12 + j] = val;
     }
 
-  sdlLockReq = SDL_MUSTLOCK(screen);
+  sdlLockReq = SDL_MUSTLOCK(surface_);
+}
+
+void ResizeWindow() {
+  SDL_DisplayMode mode;
+  SDL_GetCurrentDisplayMode(0, &mode);
+  if (is_fullscreen_) {
+    SDL_SetWindowFullscreen(window, 0);
+    width_ = 512;
+    height_ = 384;
+    scale_factor_ = 1;
+    SDL_SetWindowSize(window, width_, height_);
+    is_fullscreen_ = 0;
+  } else {
+    if (width_ * 2 > mode.w || height_ * 2 > mode.h) {
+      SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+      is_fullscreen_ = 1;
+    } else {
+      width_ *= 2;
+      height_ *= 2;
+      scale_factor_ *= 2;
+      SDL_SetWindowSize(window, width_, height_);
+    }
+  }
+  SDL_FreeSurface(surface_);
+  surface_ = SDL_CreateRGBSurface(0, width_, height_, 32, 0, 0, 0, 0);
+  if (!surface_) {
+    SDL_Log("SDL_CreateRGBSurface() failed: %s", SDL_GetError());
+    exit(1);
+  }
+
+  SDL_DestroyTexture(texture);
+  texture = SDL_CreateTextureFromSurface(renderer, surface_);
+  if (!texture) {
+    SDL_Log("Unable to init texture: %s\n", SDL_GetError());
+    exit(1);
+  }
+  sbpp = bpp * scale_factor_;
+  spitch = surface_->pitch * scale_factor_;
+  UpdateRect(surface_, 0, 0, width_, height_);
 }
 
 void CloseMC6847(void) { SDL_Quit(); }
