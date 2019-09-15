@@ -176,7 +176,6 @@ void ReadINI(char *ini_data, int ini_len) {
     offset = read_from_buf(ini_data, inputstr, offset);
 
     StripWS(inputstr);
-    printf("[%s]\n", inputstr);
     if (!strcmp("", inputstr) || inputstr[0] == '#')
       continue;
     if (!str1ncmp("COLORSET", inputstr)) {
@@ -948,6 +947,11 @@ int main(int argc, char *argv[]) {
   Bootup(spc.ROM, ini_buf);
   ReadINI(ini_buf, strlen(ini_buf));
 #else
+  if (argc >= 2 &&
+      (!strcmp("-h", argv[1]) || !strcmp("--help", argv[1]))) {
+    ShowCredit();
+    exit(1);
+  }
   FILE *fp;
   if ((fp = fopen("spcall.rom", "rb")) == NULL) {
     printf("spcall.rom (32KB) not found.\n");
@@ -973,7 +977,6 @@ int main(int argc, char *argv[]) {
 
   if (spcConfig.keyLayout) setModernKeyLayout();
   InitIOSpace();
-  ShowCredit();
   InitMC6847(spc.IO.VRAM, spcConfig.scale,
 	     spcConfig.font == 0 ? NULL : &spc.RAM[0x524A]);
   SetMC6847Mode(SET_TEXTPAGE, 0); // set text page to 0
