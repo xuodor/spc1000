@@ -5,15 +5,13 @@
  * @date 2005~2006.10
  */
 
-#include "AY8910.h" // AY-3-8910 Sound (Marat Fayzullin)
-#include "MC6847.h" // Video Display Chip (ionique)
-#include "Tables.h" // Z-80 emulator (Marat Fayzullin)
-#include "Z80.h"    // Z-80 emulator (Marat Fayzullin)
-#include "SDL_log.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "Tables.h"
+#include "spc1000.h"
+#include "SDL_log.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -29,70 +27,13 @@
 #define EDGE 1
 #define WAITEND 2
 
-#define CAS_STOP 0
-#define CAS_PLAY 1
-#define CAS_REC 2
-
 #define I_PERIOD 4000
 #define INTR_PERIOD 16.6666
 
-#define SPC_EMUL_VERSION "1.0 (2007.02.20)"
+#define SPC_EMUL_VERSION "1.1 (2024.07.14)"
 #define FCLOSE(x) fclose(x), (x) = NULL
 
 SPCConfig spcConfig;
-
-/**
- * Cassette structure for tape processing, included in the SPCIO
- */
-typedef struct {
-  int motor; // Motor Status
-  int pulse; // Motor Pulse (0->1->0) causes motor state to flip
-  int button;
-  int rdVal;
-  Uint32 startTime;
-  Uint32 cnt0, cnt1;
-
-  int wrVal;
-  Uint32 wrRisingT; // rising time
-
-  FILE *wfp;
-  FILE *rfp;
-} Cassette;
-
-/**
- * SPC IO structure, registers and memories mappted to IO space
- */
-typedef struct {
-  int IPLK;          // IPLK switch for memory selection
-  byte VRAM[0x2000]; // Video Memory (6KB)
-  byte GMODE;        // GMODE (for video)
-
-  byte psgRegNum; // Keep PSG (AY-3-8910) register number for next turn of I/O
-
-  // int intrState;
-
-  /* SPC-1000 keyboard matrix. Initially turned off. (high) */
-  byte keyMatrix[10];
-
-  Cassette cas;
-
-  AY8910 ay8910;
-} SPCIO;
-
-/**
- * SPC system structure, Z-80, RAM, ROM, IO(VRAM), etc
- */
-typedef struct {
-  Z80 Z80R;        // Z-80 register
-  byte RAM[65536]; // RAM area
-  byte ROM[32768]; // ROM area
-  SPCIO IO;
-  Uint32 tick;
-  int turbo;
-  int refrTimer;   // timer for screen refresh
-  int refrSet;     // init value for screen refresh timer
-  double intrTime; // variable for interrupt timing
-} SPCSystem;
 
 SPCSystem spc;
 
@@ -488,20 +429,24 @@ int CasRead(Cassette *cas) {
   return 0; // low for other cases
 }
 
+
+#include "dos.h"
+
+byte dosbuf[24680];
+int dosbp;
+
 void CasWrite(Cassette *cas, int val) {
   Uint32 curTime;
 
   curTime = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
   if (!cas->wrVal & val) // rising edge
     cas->wrRisingT = curTime;
-  if (cas->wrVal & !val) // falling edge
-  {
+  if (cas->wrVal & !val) { // falling edge
+    byte b = (curTime - cas->wrRisingT) < 32 ? '0' : '1';
     if (spc.IO.cas.wfp != NULL) {
-      if ((curTime - cas->wrRisingT) < 32)
-        fputc('0', cas->wfp);
-      else
-        fputc('1', cas->wfp);
-      fflush(cas->wfp);
+      fputc(b, cas->wfp);
+    } else if (spc.IO.cas.dos) {
+      dosbuf[dosbp++] = b;
     }
   }
 
@@ -540,9 +485,7 @@ void OutZ80(register word Port, register byte Value) {
   } else if ((Port & 0xE000) == 0x6000) // SMODE
   {
     if (spc.IO.cas.button != CAS_STOP) {
-
-      if ((Value & 0x02)) // Motor
-      {
+      if (Value & 0x02) { // Motor
         if (spc.IO.cas.pulse == 0) {
           spc.IO.cas.pulse = 1;
         }
@@ -554,6 +497,16 @@ void OutZ80(register word Port, register byte Value) {
 #ifdef DEBUG_MODE
             printf("Motor Off\n");
 #endif
+            if (spc.IO.cas.dos) {
+              if (spc.IO.cas.rfp) {
+                // button == CAS_PLAY
+                FCLOSE(spc.IO.cas.rfp);
+              }
+              if (spc.IO.cas.wfp) {
+                // button == CAS_REC
+                FCLOSE(spc.IO.cas.wfp);
+              }
+            }
           } else {
             spc.IO.cas.motor = 1;
 #ifdef DEBUG_MODE
@@ -565,10 +518,30 @@ void OutZ80(register word Port, register byte Value) {
           }
         }
       }
-    }
+    } // != CAS_STOP
 
-    if (spc.IO.cas.button == CAS_REC && spc.IO.cas.motor) {
+    if (spc.IO.cas.button == CAS_REC && spc.IO.cas.motor)
       CasWrite(&spc.IO.cas, Value & 0x01);
+
+    if (Value & 0x10) {  // DOS signal
+      if (!spc.IO.cas.dos) {
+        spc.IO.cas.dos = 1;
+        spc.IO.cas.button = CAS_REC;
+        memset(dosbuf, 0, sizeof dosbuf);
+        dosbp = 0;
+        if (spc.IO.cas.wfp) {
+          FCLOSE(spc.IO.cas.wfp);
+        }
+      }
+    } else if (spc.IO.cas.dos) {
+      spc.IO.cas.dos = 0;
+      if (spc.IO.cas.wfp) {
+        FCLOSE(spc.IO.cas.wfp);
+      }
+      Uint32 start_time = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
+      if (exec_doscmd(dosbuf, &spc.IO.cas, start_time)) {
+        ResetCassette(&spc.IO.cas);
+      }
     }
   } else if ((Port & 0xFFFE) == 0x4000) // PSG
   {
