@@ -164,8 +164,12 @@ DOSLOAD:
 
     LD A,DOSLFG
     CALL DOSREQ
-    CALL LOAD
-    JR DOSEND
+
+    ;; Skip DOSEND. In order to handle multi-content file
+    ;; loading, DOSL should not stop or close the present
+    ;; loading stream. User is required to hit F10 (STOP)
+    ;; to manually close it.
+    JP LOAD
 
     ;; Save files
 DOSSAVE:
@@ -247,15 +251,15 @@ DOSREQ1:
     LD (DE),A
     RET
 
-;;; Repurpose LET to DOS
-
-ORG 1B1CH
-    JP DOS
-
-ORG 679BH
-    DEFB    44H, 4FH, 0D3H                 ; DOS
+;;; Redirect LET to DOS
+ORG 2F98H
+    DEFW DOS
 
 ;;; Update the reference to UDLMES
 
 ORG 3F6BH
     LD DE,UDLMES2
+
+;;; Rename LET to DOS
+ORG 679BH
+    DEFB    44H, 4FH, 0D3H                 ; DOS

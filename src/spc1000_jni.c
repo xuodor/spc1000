@@ -64,14 +64,12 @@ void ReadAsset(AAsset* asset, unsigned char *buf) {
   }
 }
 
-void Bootup(unsigned char *rom, unsigned char *ini) {
+void Bootup(unsigned char *ini) {
   AAssetDir* assetDir = AAssetManager_openDir(context_.assetManager, "");
   const char* asset_name;
-  const size_t rom_size = 32768;
   while ((asset_name = AAssetDir_getNextFileName(assetDir)) != NULL) {
       AAsset* asset = AAssetManager_open(context_.assetManager, asset_name, AASSET_MODE_STREAMING);
-      if (!strcmp("spcall.rom", asset_name)) ReadAsset(asset, rom);
-      else if (!strcmp("spcemul.ini", asset_name)) ReadAsset(asset, ini);
+      if (!strcmp("spcemul.ini", asset_name)) ReadAsset(asset, ini);
       AAsset_close(asset);
   }
   AAssetDir_close(assetDir);

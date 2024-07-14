@@ -9,6 +9,7 @@ set(SOURCE_FILES \\
     src/Debug.c \\
     src/Z80SPC.c \\
     src/dos.c \\
+    src/rom.c \\
     ${TFD}/tinyfiledialogs.c)
 find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})

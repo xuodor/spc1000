@@ -67,6 +67,11 @@ sudo apt-get install libsdl2-dev
   - Emulator doesn't work after resuming from background/device rotation
   - Make the emulator .INI file configurable (hard-coded now)
 
+## Supporting tape-based DOS
+[The latest version](https://github.com/xuodor/spc1000/commit/7092f03a10388dd04bbae98d172994470d139a25) supports disk-like operating using cassette tape I/O. Check out the demo:
+
+[![SPC-1000 tape DOS](https://img.youtube.com/vi/LE_BQTkdAO0PlgUK/0.jpg)](https://youtu.be/aYlQKWCQPE0?si=LE_BQTkdAO0PlgUK)
+
 ## Credits
 
 - [https://blog.naver.com/ionique/10015262896](https://blog.naver.com/ionique/10015262896) Base emulator code

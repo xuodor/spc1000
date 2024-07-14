@@ -118,6 +118,7 @@ int exec_doscmd(byte *buf, Cassette *cas, Uint32 start_time) {
   switch (cmd) {
   case DOSCMD_VIEW:
     build_list_fcb(DOS_LISTFILE);
+    if (cas->rfp) fclose(cas->rfp);
     if ((cas->rfp = fopen(DOS_LISTFILE, "rb")) != NULL) {
       cas->button = CAS_PLAY;
       cas->startTime = start_time;
@@ -126,6 +127,7 @@ int exec_doscmd(byte *buf, Cassette *cas, Uint32 start_time) {
     break;
   case DOSCMD_LOAD:
     set_filename(buf, filename);
+    if (cas->rfp) fclose(cas->rfp);
     cas->rfp = fopen(filename, "rb");
 
     /* File not found. Notify user with an error. */

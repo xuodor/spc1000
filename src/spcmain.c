@@ -498,14 +498,10 @@ void OutZ80(register word Port, register byte Value) {
             printf("Motor Off\n");
 #endif
             if (spc.IO.cas.dos) {
-              if (spc.IO.cas.rfp) {
-                // button == CAS_PLAY
+              if (spc.IO.cas.rfp)
                 FCLOSE(spc.IO.cas.rfp);
-              }
-              if (spc.IO.cas.wfp) {
-                // button == CAS_REC
+              if (spc.IO.cas.wfp)
                 FCLOSE(spc.IO.cas.wfp);
-              }
             }
           } else {
             spc.IO.cas.motor = 1;
@@ -906,6 +902,8 @@ void ShowCredit(void) {
   printf("any damage or legal issue\ncaused by using this program.\n");
 }
 
+extern byte rom_image[];
+
 /**
  * Starting point and main loop for SPC-1000 emulator
  */
@@ -914,10 +912,12 @@ int main(int argc, char *argv[]) {
   int prevTurboState = 0;
   int turboState = 0;
 
+  memcpy(spc.ROM, rom_image, 32768);
+
 #if defined(__ANDROID__)
   unsigned char ini_buf[512];
   memset(ini_buf, 0, 512);
-  Bootup(spc.ROM, ini_buf);
+  Bootup(ini_buf);
   ReadINI(ini_buf, strlen(ini_buf));
 #else
   if (argc >= 2 &&
@@ -925,14 +925,8 @@ int main(int argc, char *argv[]) {
     ShowCredit();
     exit(1);
   }
-  FILE *fp;
-  if ((fp = fopen("spcall.rom", "rb")) == NULL) {
-    printf("spcall.rom (32KB) not found.\n");
-    exit(1);
-  }
-  fread(spc.ROM, 1, 32768, fp); // read ROM file
-  fclose(fp);
 
+  FILE *fp;
   if ((fp = fopen("SPCEMUL.INI", "rb")) == NULL) {
     printf("SPCEMUL.INI not found.\n");
     exit(1);
