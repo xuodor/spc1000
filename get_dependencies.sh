@@ -15,7 +15,7 @@ if [ ! -d "$TFD" ]; then
   pushd external
   wget https://github.com/native-toolkit/tinyfiledialogs/archive/master.zip
   unzip -q master.zip
-  mv tinyfiledialogs-master tfd
+  mv libtinyfiledialogs-master tfd
   rm master.zip
   popd
 fi
