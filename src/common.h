@@ -20,6 +20,8 @@ typedef struct
         int font;
 } SPCConfig;
 
+typedef unsigned char byte;
+
 #define SPCCOL_OLDREV		0
 #define SPCCOL_NEW1			1
 #define SPCCOL_NEW2			2
@@ -30,5 +32,18 @@ typedef struct
 #define SCANLINE_045_ONLY	2
 
 extern SPCConfig spcConfig;
+
+#define MIN(x,y) (((x) <= (y)) ? (x) : (y))
+#define MAX(x,y) (((x) <= (y)) ? (y) : (x))
+
+//#define DEBUG_MODE 1
+
+int null_printf(const char *format, ...);
+
+#ifdef DEBUG_MODE
+#define DLOG printf
+#else
+#define DLOG null_printf
+#endif
 
 #endif

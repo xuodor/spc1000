@@ -8,6 +8,9 @@ set(SOURCE_FILES \\
     ../src/spcmain.c \\
     ../src/Debug.c \\
     ../src/Z80SPC.c \\
+    ../src/cgbuf.c \\
+    ../src/osd.c \\
+    ../src/rom.c \\
     ../src/spc1000_jni.c)
 
 set(SDL_LOCATION ${CMAKE_SOURCE_DIR}/../external/SDL2)

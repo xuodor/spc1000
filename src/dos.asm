@@ -131,15 +131,6 @@ DOSVIEW:
     LD A,11h
     LD (38A7h),A
 
-    LD A,(FILECNT)
-    OR A
-    JR Z,DOSEND
-
-    LD HL,DOSEND
-    PUSH HL
-    LD HL,(MTEXEC)
-    JP (HL)
-
     ;; Send an empty command to finish
 DOSEND:
     XOR A
@@ -147,11 +138,7 @@ DOSEND:
 
     ;; Load files
 DOSLOAD:
-    CALL DOSFLST
-
-    ;; Restore buf pointer
-    LD H,B
-    LD L,C
+    CALL DOSFLN
 
     LD A,DOSLFG
     CALL DOSREQ
@@ -171,7 +158,8 @@ DOSSAVE:
     JR NZ,DOSSV1
     INC HL
 DOSSV1:
-    CALL DOSFLST
+    CALL DOSFLN
+    JP Z,FILEER
     POP HL
     LD A,DOSSFG
     CALL DOSREQ
@@ -180,28 +168,28 @@ DOSSV1:
 
     ;; Delete files
 DOSDEL:
-    CALL DOSFLST
-
-    ;; Restore buf pointer
-    LD H,B
-    LD L,C
+    CALL DOSFLN
+    JP Z,FILEER
 
     LD A,DOSDFG
     CALL DOSREQ
     RET
 
     ;; Set filename to FIB
-DOSFLST:
+DOSFLN:
     LD A,0C9H                   ; RET
     LD (SETLFNB),A
     CALL SETLFN
     LD A,21H
     LD (SETLFNB),A
 
-    ;; Empty filename not allowed
+    ;; Restore buf pointer
+    LD H,B
+    LD L,C
+
+    ;; Check empty filename
     LD A,(FILENAM)
     OR A
-    JP Z,FILEER
     RET
 
     ;; Send DOS command to cassette

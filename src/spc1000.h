@@ -5,6 +5,7 @@
 #include "Z80.h"
 
 typedef unsigned long uint32;
+typedef int bool;
 
 /**
  * Cassette structure for tape processing, included in the SPCIO

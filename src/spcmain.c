@@ -8,24 +8,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "Tables.h"
 #include "spc1000.h"
-#include "SDL_log.h"
+#include "SDL.h"
 #include "MC6847.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
 #include "spc1000_jni.h"
-#else
-#include "tinyfiledialogs.h"
 #endif
 
 #include "common.h"
-#include "spckey.h" // keyboard definition
 #include "dos.h"
-
-#define DEBUG_MODE 1
+#include "osd.h"
 
 #define NONE 0
 #define EDGE 1
@@ -42,6 +39,7 @@ SPCConfig spcConfig;
 SPCSystem spc;
 
 DosBuf dosbuf_;
+byte *cgbuf_;
 
 /**
  * SPC simulation structure, realted to the timing
@@ -51,6 +49,90 @@ typedef struct {
 } SPCSimul;
 
 SPCSimul simul;
+
+TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
+{
+	{ SDLK_RSHIFT, 0, 0x02, "SHIFT"},
+	{ SDLK_LSHIFT, 0, 0x02, "SHIFT"},
+	{ SDLK_LCTRL, 0, 0x04, "CTRL" },
+	{ SDLK_RCTRL, 0, 0x04, "CTRL" },
+	{ SDLK_PAUSE, 0, 0x10, "BREAK" },
+	{ SDLK_LALT, 0, 0x40, "GRAPH" },
+	{ SDLK_RALT, 0, 0x40, "GRAPH"  },
+
+	{ SDLK_BACKQUOTE, 1, 0x01, "TILDE" },
+	{ SDLK_HOME, 1, 0x02, "HOME" },
+	{ SDLK_SPACE, 1, 0x04, "SPACE" },
+	{ SDLK_RETURN, 1, 0x08, "RETURN" },
+	{ SDLK_c, 1, 0x10, "C" },
+	{ SDLK_a, 1, 0x20, "A" },
+	{ SDLK_q, 1, 0x40, "Q" },
+	{ SDLK_1, 1, 0x80, "1" },
+
+	{ SDLK_TAB, 2, 0x01, "CAPS" },
+	{ SDLK_z, 2, 0x04, "Z" },
+	{ SDLK_RIGHTBRACKET, 2, 0x08, "]" },
+	{ SDLK_v, 2, 0x10, "V" },
+	{ SDLK_s, 2, 0x20, "S" },
+	{ SDLK_w, 2, 0x40, "W" },
+	{ SDLK_2, 2, 0x80, "2" },
+
+	{ SDLK_BACKSPACE, 3, 0x01, "DEL" },
+	{ SDLK_ESCAPE, 3, 0x04, "ESC" },
+	{ SDLK_LEFTBRACKET, 3, 0x08, "]" },
+	{ SDLK_b, 3, 0x10, "B" },
+	{ SDLK_d, 3, 0x20, "D" },
+	{ SDLK_e, 3, 0x40, "E" },
+	{ SDLK_3, 3, 0x80, "3" },
+
+	{ SDLK_RIGHT, 4, 0x04, "->" },
+	{ SDLK_BACKSLASH, 4, 0x08, "\\" },
+	{ SDLK_n, 4, 0x10, "N" },
+	{ SDLK_f, 4, 0x20, "F" },
+	{ SDLK_r, 4, 0x40, "R" },
+	{ SDLK_4, 4, 0x80, "4" },
+
+	{ SDLK_F1, 5, 0x02, "F1" },
+	{ SDLK_LEFT, 5, 0x04, "->" },
+	{ SDLK_m, 5, 0x10, "M" },
+	{ SDLK_g, 5, 0x20, "G" },
+	{ SDLK_t, 5, 0x40, "T" },
+	{ SDLK_5, 5, 0x80, "5" },
+
+	{ SDLK_F2, 6, 0x02, "F2" },
+	{ SDLK_EQUALS, 6, 0x04, "@" },
+	{ SDLK_x, 6, 0x08, "X" },
+	{ SDLK_COMMA, 6, 0x10, "," },
+	{ SDLK_h, 6, 0x20, "H" },
+	{ SDLK_y, 6, 0x40, "Y" },
+	{ SDLK_6, 6, 0x80, "6" },
+
+	{ SDLK_F3, 7, 0x02, "F3" },
+	{ SDLK_UP, 7, 0x04, "UP" },
+	{ SDLK_p, 7, 0x08, "P" },
+	{ SDLK_PERIOD, 7, 0x10, "." },
+	{ SDLK_j, 7, 0x20, "J" },
+	{ SDLK_u, 7, 0x40, "U" },
+	{ SDLK_7, 7, 0x80, "7" },
+
+	{ SDLK_F4, 8, 0x02, "F4" },
+	{ SDLK_DOWN, 8, 0x04, "DN" },
+	{ SDLK_QUOTE, 8, 0x08, ":" },
+	{ SDLK_SLASH, 8, 0x10, "/" },
+	{ SDLK_k, 8, 0x20, "K" },
+	{ SDLK_i, 8, 0x40, "I" },
+	{ SDLK_8, 8, 0x80, "8" },
+
+	{ SDLK_F5, 9, 0x02, "F5" },
+	{ SDLK_MINUS, 9, 0x04, "-" },
+	{ SDLK_0, 9, 0x08, "0" },
+	{ SDLK_SEMICOLON, 9, 0x10, ";" },
+	{ SDLK_l, 9, 0x20, "L" },
+	{ SDLK_o, 9, 0x40, "O" },
+	{ SDLK_9, 9, 0x80, "9" },
+
+	{ 0, -1, 0, "LAST KEY" }
+};
 
 /*************************************************************/
 /** INI file processing                                     **/
@@ -78,6 +160,7 @@ int str1ncmp(char *keyword, char *str) {
   return strncmp(keyword, str, sizeof(keyword));
 }
 
+int null_printf(const char *format, ...) {}
 /**
  * Get a integer value from the string of "KEYWORD=VALUE" form
  * @param str the string of "KEYWORD=VALUE" form
@@ -174,7 +257,7 @@ void ReadINI(char *ini_data, int ini_len) {
       continue;
     }
 #endif
-    printf("The following line in the INI file is ignored:\n\t%s\n", inputstr);
+    DLOG("The following line in the INI file is ignored:\n\t%s\n", inputstr);
   }
 }
 
@@ -250,131 +333,65 @@ byte RdZ80(register word Addr) {
     return spc.RAM[Addr];
 }
 
-/*************************************************************/
-/** Image File (Z80+Memory+IO+VRAM Save File) Read/Write    **/
-/*************************************************************/
+/*
+ * System Snapshot (Z80+Memory+IO+VRAM) Read/Write
+ */
 
-#if !defined(__ANDROID__)
-int LoadImageFile(void) {
-  char const *filters[2] = {"*.sav", "*.SAV"};
-  char const *name;
-  int res = -1;
+int spc_save_snapshot(void) {
+  char name[32];
+  time_t t;
+  struct tm *tmp;
   FILE *fp;
-  name = tinyfd_openFileDialog("Load System Image", "", 2, filters,
-                               "image files", 0);
-  if (name && (fp = fopen(name, "rb")) != NULL) {
-    fread(&spc, sizeof(spc), 1, fp);
-    fclose(fp);
-    res = 0;
+
+  t = time(NULL);
+  tmp = localtime(&t);
+  if (tmp == NULL) {
+    perror("Error localtime");
+    return -1;
   }
-  return res;
-}
 
-int SaveImageFile(void) {
-  char const *filters[2] = {"*.sav", "*.SAV"};
-  char const *name;
-  int res = -1;
-  FILE *fp;
-  name = tinyfd_saveFileDialog("Save System Image", "RAMIMAGE.SAV", 2, filters,
-                               NULL);
-  if (name && (fp = fopen(name, "wb")) != NULL) {
+  if (strftime(name, sizeof(name), "%d%H%M%S.sav", tmp) == 0) {
+    perror("Error in stftime");
+    return -2;
+  }
+
+  if ((fp = fopen(name, "wb")) != NULL) {
     fwrite(&spc, sizeof(spc), 1, fp);
     fclose(fp);
-    res = 0;
+    DLOG("Image saved: %s\n", name);
+
+    /* Limit the snapshot files count below 32. Remove older ones. */
+
+    return 0;
   }
-  return res;
-}
-#else
-int LoadImageFile(void) {
-  FILE *fp;
-  char name[256];
-  int res = OpenImageDialog(name);
-  if (!res) {
-    if ((fp = fopen(name, "rb")) == NULL) {
-      res = -1;
-    } else {
-      fread(&spc, sizeof(spc), 1, fp);
-      fclose(fp);
-    }
-  }
-  return res;
+  return -3;
 }
 
-int SaveImageFile(void) {
-  FILE *fp;
-  char name[256];
-  int res = SaveImageDialog(name);
-  if (!res) {
-    if ((fp = fopen(name, "wb")) == NULL) {
-      res = -1;
+void spc_load_snapshot(byte *filename) {
+  if (filename[0] != '\0') {
+    FILE *fp = fopen(filename, "rb");
+    fread(&spc, sizeof(spc), 1, fp);
+    fclose(fp);
+
+    simul.curTick = SDL_GetTicks() - simul.baseTick;
+    spc.tick = simul.curTick;
+    spc.IO.cas.rfp = NULL;
+    spc.IO.cas.wfp = NULL;
+    spc.IO.cas.button = CAS_STOP;
+    spc.IO.cas.motor = 0;
+    if (spc.IO.GMODE & 0x08) {
+      SetMC6847Mode(SET_GRAPHIC, spc.IO.GMODE);
+      UpdateMC6847Gr(MC6847_UPDATEALL);
     } else {
-      fwrite(&spc, sizeof(spc), 1, fp);
-      fclose(fp);
+      SetMC6847Mode(SET_TEXTMODE, spc.IO.GMODE);
+      UpdateMC6847Text(MC6847_UPDATEALL);
     }
   }
-  return res;
 }
-#endif // __ANDROID__
 
 /*************************************************************/
 /** Cassette Tape Processing                                **/
 /*************************************************************/
-#if !defined(__ANDROID__)
-int OpenTapeFile(void) {
-  char const *filters[2] = {"*.tap", "*.TAP"};
-  char const *name;
-  int res = -1;
-  name =
-      tinyfd_openFileDialog("Read tape file", "", 2, filters, "tape files", 0);
-  if (name && (spc.IO.cas.rfp = fopen(name, "rb")) != NULL) {
-    res = 0;
-  }
-  return res;
-}
-
-int SaveAsTapeFile(void) {
-  char const *filters[2] = {"*.tap", "*.TAP"};
-  char const *name;
-  char defaultPath[256];
-  int res = -1;
-
-  strncpy(defaultPath, &(spc.RAM[0x1397]), 16);
-  defaultPath[16] = '\0';
-  strcat(defaultPath, ".TAP");
-  name = tinyfd_saveFileDialog("Save program to tape file", defaultPath, 2,
-                               filters, NULL);
-  if (name && (spc.IO.cas.wfp = fopen(name, "wb")) != NULL) {
-    res = 0;
-  }
-  return res;
-}
-#else
-int OpenTapeFile(void) {
-  char name[256];
-  int res = OpenTapeDialog(name);
-  if (!res) {
-    if ((spc.IO.cas.rfp = fopen(name, "rb")) == NULL) {
-      res = -1;
-    }
-  }
-  return res;
-}
-
-int SaveAsTapeFile(void) {
-  char name[256] = "\0";
-  strncpy(name, &(spc.RAM[0x1397]), 16);
-  strcat(name, ".TAP");
-  int res = SaveTapeDialog(name);
-  if (!res) {
-    if ((spc.IO.cas.wfp = fopen(name, "wb")) == NULL) {
-      res = -1;
-    }
-  }
-  return res;
-}
-
-#endif // __ANDROID__
-
 int ReadVal(void) {
   int c = -1;
 
@@ -386,7 +403,7 @@ int ReadVal(void) {
     c = fgetc(spc.IO.cas.rfp);
     if (c == EOF) {
       if (!EOF_flag) {
-        printf("EOF\n");
+        DLOG("EOF\n");
         EOF_flag = 1;
       }
       c = -1;
@@ -456,6 +473,10 @@ void CasWrite(Cassette *cas, int val) {
   cas->wrVal = val;
 }
 
+uint32 spc_cas_start_time() {
+  return (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
+}
+
 /*************************************************************/
 /** Output I/O Processing                                   **/
 /*************************************************************/
@@ -482,9 +503,7 @@ void OutZ80(register word Port, register byte Value) {
         SetMC6847Mode(SET_TEXTMODE, Value);
     }
     spc.IO.GMODE = Value;
-#ifdef DEBUG_MODE
-    printf("GMode:%02X\n", Value);
-#endif
+    DLOG("GMode:%02X\n", Value);
   } else if ((Port & 0xE000) == 0x6000) // SMODE
   {
     if (spc.IO.cas.button != CAS_STOP) {
@@ -497,9 +516,7 @@ void OutZ80(register word Port, register byte Value) {
           spc.IO.cas.pulse = 0;
           if (spc.IO.cas.motor) {
             spc.IO.cas.motor = 0;
-#ifdef DEBUG_MODE
-            printf("Motor Off\n");
-#endif
+            DLOG("Motor Off\n");
             if (spc.IO.cas.dos) {
               if (spc.IO.cas.rfp)
                 FCLOSE(spc.IO.cas.rfp);
@@ -508,9 +525,7 @@ void OutZ80(register word Port, register byte Value) {
             }
           } else {
             spc.IO.cas.motor = 1;
-#ifdef DEBUG_MODE
-            printf("Motor On\n");
-#endif
+            DLOG("Motor On\n");
             spc.IO.cas.startTime =
                 (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
             ResetCassette(&spc.IO.cas);
@@ -537,7 +552,7 @@ void OutZ80(register word Port, register byte Value) {
         FCLOSE(spc.IO.cas.wfp);
       }
       Uint32 start_time = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-      if (exec_doscmd(&dosbuf_, &spc.IO.cas, start_time)) {
+      if (dos_exec(&dosbuf_, &spc.IO.cas, start_time)) {
         ResetCassette(&spc.IO.cas);
       }
     }
@@ -612,41 +627,16 @@ void BuildKeyHashTab(void) {
  * SDL Key-Down processing. Special Keys only for Emulator
  * @param sym SDL key symbol
  */
-void ProcessSpecialKey(SDLKey sym) {
-  int index = sym % 256;
+void ProcessSpecialKey(SDL_Keysym sym) {
   FILE *rfp_save;
   FILE *wfp_save;
 
-  switch (sym) {
+  switch (sym.sym) {
   case SDLK_SCROLLOCK:               // turbo mode
     spc.turbo = (spc.turbo) ? 0 : 1; // toggle
-    printf("turbo %s\n", (spc.turbo) ? "on" : "off");
+    DLOG("turbo %s\n", (spc.turbo) ? "on" : "off");
     break;
-  case SDLK_F8: // PLAY button
-    if (spc.IO.cas.rfp != NULL)
-      FCLOSE(spc.IO.cas.rfp);
-    if (spc.IO.cas.wfp != NULL)
-      FCLOSE(spc.IO.cas.wfp);
-    if (OpenTapeFile() < 0)
-      break;
-    spc.IO.cas.button = CAS_PLAY;
-    spc.IO.cas.motor = 1;
-    spc.IO.cas.startTime = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-    ResetCassette(&spc.IO.cas);
-    printf("play button\n");
-    break;
-  case SDLK_F9: // REC button
-    if (spc.IO.cas.rfp != NULL)
-      FCLOSE(spc.IO.cas.rfp);
-    if (spc.IO.cas.wfp != NULL)
-      FCLOSE(spc.IO.cas.wfp);
-    if (SaveAsTapeFile() < 0)
-      break;
-    spc.IO.cas.button = CAS_REC;
-    spc.IO.cas.motor = 1;
-    ResetCassette(&spc.IO.cas);
-    printf("rec button\n");
-    break;
+
   case SDLK_F10: // STOP button
     spc.IO.cas.button = CAS_STOP;
     spc.IO.cas.motor = 0;
@@ -654,14 +644,17 @@ void ProcessSpecialKey(SDLKey sym) {
       FCLOSE(spc.IO.cas.rfp);
     if (spc.IO.cas.wfp != NULL)
       FCLOSE(spc.IO.cas.wfp);
-    printf("stop button\n");
+    DLOG("stop button\n");
     break;
 
   case SDLK_PAGEUP: // Image Save
-    SaveImageFile();
-    simul.curTick = SDL_GetTicks() - simul.baseTick;
-    spc.tick = simul.curTick;
-    printf("Image Save\n");
+    if (!spc_save_snapshot()) {
+      simul.curTick = SDL_GetTicks() - simul.baseTick;
+      spc.tick = simul.curTick;
+      osd_toast("SNAPSHOT TAKEN", 0, 0);
+    } else {
+      osd_toast("SNAPSHOT ERROR", 0, 0);
+    }
     break;
 
   case SDLK_PAGEDOWN: // Image Load
@@ -669,21 +662,7 @@ void ProcessSpecialKey(SDLKey sym) {
       FCLOSE(spc.IO.cas.rfp);
     if (spc.IO.cas.wfp != NULL)
       FCLOSE(spc.IO.cas.wfp);
-    LoadImageFile();
-    simul.curTick = SDL_GetTicks() - simul.baseTick;
-    spc.tick = simul.curTick;
-    spc.IO.cas.rfp = NULL;
-    spc.IO.cas.wfp = NULL;
-    spc.IO.cas.button = CAS_STOP;
-    spc.IO.cas.motor = 0;
-    if (spc.IO.GMODE & 0x08) {
-      SetMC6847Mode(SET_GRAPHIC, spc.IO.GMODE);
-      UpdateMC6847Gr(MC6847_UPDATEALL);
-    } else {
-      SetMC6847Mode(SET_TEXTMODE, spc.IO.GMODE);
-      UpdateMC6847Text(MC6847_UPDATEALL);
-    }
-    printf("Image Load\n");
+    if (!osd_dialog_on()) osd_open_dialog("SNAPSHOT", "*.sav", spc_load_snapshot);
     break;
 
   case SDLK_F11:
@@ -693,7 +672,7 @@ void ProcessSpecialKey(SDLKey sym) {
 #endif
     break;
   case SDLK_F12: // Reset
-    printf("Reset (keeping tape pos.)\n");
+    DLOG("Reset (keeping tape pos.)\n");
     rfp_save = spc.IO.cas.rfp;
     wfp_save = spc.IO.cas.wfp;
     InitIOSpace();
@@ -725,10 +704,8 @@ void ProcessKeyDown(SDLKey sym) {
     if (KeyHashTab[index].keys[i].sym == sym) {
       spc.IO.keyMatrix[KeyHashTab[index].keys[i].keyMatIdx] &=
           ~(KeyHashTab[index].keys[i].keyMask);
-#ifdef DEBUG_MODE2
-      printf("%08x [%s] key down\n", KeyHashTab[index].keys[i].sym,
+      DLOG("%08x [%s] key down\n", KeyHashTab[index].keys[i].sym,
              KeyHashTab[index].keys[i].keyName);
-#endif
       break;
     }
   }
@@ -746,10 +723,8 @@ void ProcessKeyUp(SDLKey sym) {
     if (KeyHashTab[index].keys[i].sym == sym) {
       spc.IO.keyMatrix[KeyHashTab[index].keys[i].keyMatIdx] |=
           (KeyHashTab[index].keys[i].keyMask);
-#ifdef DEBUG_MODE2
-      printf("%08x [%s] key up\n", KeyHashTab[index].keys[i].sym,
+      DLOG("%08x [%s] key up\n", KeyHashTab[index].keys[i].sym,
              KeyHashTab[index].keys[i].keyName);
-#endif
       break;
     }
   }
@@ -764,14 +739,15 @@ void CheckKeyboard(void) {
   while (SDL_PollEvent(&event) > 0) {
     switch (event.type) {
     case SDL_KEYDOWN:
-      ProcessSpecialKey(event.key.keysym.sym);
-      ProcessKeyDown(event.key.keysym.sym);
+      ProcessSpecialKey(event.key.keysym);
+      if (!osd_dialog_on()) ProcessKeyDown(event.key.keysym.sym);
+      else osd_process_key(event.key.keysym.sym);
       break;
     case SDL_KEYUP:
-      ProcessKeyUp(event.key.keysym.sym);
+      if (!osd_dialog_on()) ProcessKeyUp(event.key.keysym.sym);
       break;
     case SDL_QUIT:
-      printf("Quit requested, quitting.\n");
+      DLOG("Quit requested, quitting.\n");
       exit(0);
       break;
     }
@@ -788,7 +764,7 @@ void flushSDLKeys(void) {
   while (SDL_PollEvent(&event) > 0) {
     cnt++;
   }
-  printf("Total %d events flushed.\n", cnt);
+  DLOG("Total %d events flushed.\n", cnt);
 }
 
 /**
@@ -880,14 +856,14 @@ word LoopZ80(register Z80 *R) { return INT_NONE; }
 void ShowCredit(void) {
   printf("[SPC-1000 Emulator V%s]\n\n", SPC_EMUL_VERSION);
   printf("Written by ionique (K.-H. Sihn).\n");
+  printf("Updated by Jindor (Jinsuk Kim)\n");
   printf("Thanks to zanny, loderunner, zzapuno, kosmo, mayhouse.\n");
   printf("contact: http://blog.naver.com/ionique\n\n");
-
-  printf("This emulator uses Z-80 and AY-3-8910 emulation from Marat "
-         "Fayzullin.\n");
+  printf("         https://github.com/xuodor/spc1000\n\n");
+  printf("Z-80/AY-3-8910 emulation from Marat Fayzullin.\n");
   printf("Find more about them at http://fms.komkon.org/\n\n");
 
-  printf("Brief usage of keyboard:\n");
+  printf("Help:\n");
   printf("F8 : cassette PLAY button\n");
   printf("F9 : cassette REC button\n");
   printf("F10: cassette STOP button\n");
@@ -895,11 +871,12 @@ void ShowCredit(void) {
   printf("F12: Reset (keeping tape position)\n");
   printf("Scroll Lock: Turbo mode\n");
   printf("TAB: LOCK key\n");
-  printf("PgUp/PgDn: Save/Load current status\n\n");
+  printf("Ins: Save snapshot\n");
+  printf("PgUp/PgDn: Load snapshot\n\n");
 
   printf("For other settings, see SPCEMUL.INI\n");
 
-  printf("This program is freeware, provided with no warranty.\n");
+  printf("This program is a freeware, provided with no warranty.\n");
   printf("The author takes no responsibility for ");
   printf("any damage or legal issue\ncaused by using this program.\n");
 }
@@ -930,7 +907,7 @@ int main(int argc, char *argv[]) {
 
   FILE *fp;
   if ((fp = fopen("SPCEMUL.INI", "rb")) == NULL) {
-    printf("SPCEMUL.INI not found.\n");
+    DLOG("SPCEMUL.INI not found.\n");
     exit(1);
   }
   fseek(fp, 0, SEEK_END);
@@ -945,9 +922,10 @@ int main(int argc, char *argv[]) {
 #endif
 
   if (spcConfig.keyLayout) setModernKeyLayout();
+  cgbuf_ = &spc.RAM[0x524A];
   InitIOSpace();
   InitMC6847(spc.IO.VRAM, spcConfig.scale,
-	     spcConfig.font == 0 ? NULL : &spc.RAM[0x524A]);
+	     spcConfig.font ? cgbuf_ : 0);
   SetMC6847Mode(SET_TEXTPAGE, 0); // set text page to 0
   OpenSoundDevice();
   BuildKeyHashTab(); // Init keyboard hash table
