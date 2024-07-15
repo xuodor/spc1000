@@ -22,6 +22,9 @@
 
 #include "common.h"
 #include "spckey.h" // keyboard definition
+#include "dos.h"
+
+#define DEBUG_MODE 0
 
 #define NONE 0
 #define EDGE 1
@@ -36,6 +39,8 @@
 SPCConfig spcConfig;
 
 SPCSystem spc;
+
+DosBuf dosbuf_;
 
 /**
  * SPC simulation structure, realted to the timing
@@ -370,23 +375,26 @@ int SaveAsTapeFile(void) {
 #endif // __ANDROID__
 
 int ReadVal(void) {
-  int c;
+  int c = -1;
 
-  if (spc.IO.cas.rfp != NULL) {
+  if (dos_hasdata(&dosbuf_)) {
+    return dos_read(&dosbuf_);
+  } else  if (spc.IO.cas.rfp != NULL) {
     static int EOF_flag = 0;
 
     c = fgetc(spc.IO.cas.rfp);
     if (c == EOF) {
-      if (!EOF_flag)
-        printf("EOF\n"), EOF_flag = 1;
+      if (!EOF_flag) {
+        printf("EOF\n");
+        EOF_flag = 1;
+      }
       c = -1;
     } else {
       EOF_flag = 0;
       c -= '0';
     }
-    return c;
   }
-  return -1;
+  return c;
 }
 
 int CasRead(Cassette *cas) {
@@ -429,12 +437,6 @@ int CasRead(Cassette *cas) {
   return 0; // low for other cases
 }
 
-
-#include "dos.h"
-
-byte dosbuf[24680];
-int dosbp;
-
 void CasWrite(Cassette *cas, int val) {
   Uint32 curTime;
 
@@ -446,7 +448,7 @@ void CasWrite(Cassette *cas, int val) {
     if (spc.IO.cas.wfp != NULL) {
       fputc(b, cas->wfp);
     } else if (spc.IO.cas.dos) {
-      dosbuf[dosbp++] = b;
+      dos_putc(&dosbuf_, b);
     }
   }
 
@@ -523,8 +525,7 @@ void OutZ80(register word Port, register byte Value) {
       if (!spc.IO.cas.dos) {
         spc.IO.cas.dos = 1;
         spc.IO.cas.button = CAS_REC;
-        memset(dosbuf, 0, sizeof dosbuf);
-        dosbp = 0;
+        dos_reset(&dosbuf_);
         if (spc.IO.cas.wfp) {
           FCLOSE(spc.IO.cas.wfp);
         }
@@ -535,7 +536,7 @@ void OutZ80(register word Port, register byte Value) {
         FCLOSE(spc.IO.cas.wfp);
       }
       Uint32 start_time = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-      if (exec_doscmd(dosbuf, &spc.IO.cas, start_time)) {
+      if (exec_doscmd(&dosbuf_, &spc.IO.cas, start_time)) {
         ResetCassette(&spc.IO.cas);
       }
     }

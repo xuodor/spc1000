@@ -6,20 +6,48 @@
 #include "Z80.h"
 #include "dos.h"
 
-#define OFFSET_PREAMBLE (0x55f0 + 0x28 + 0x28 + 1)
-#define OFFSET_FCB_EXT ((1 + 17 + 2 + 2 + 2) * 9)
-#define MIN(x,y) (((x) <= (y)) ? (x) : (y))
-#define MAX_FILES 15
-#define FIB_TAP_SIZE 24679
-#define FNF_TAP "fnf.bin"
-
 /*
  * Handles disk-like operations with cassette interface.
  *
  * TODO:
- *  - Do not create .dosfile but handle it in memory
+ *  - Devise dialogbox-less UI for image save/load
  *  - Support more files (15 for now)
  */
+
+void dos_putc(DosBuf *db, byte b) {
+  db->buf[db->p++] = b;
+  db->len++;
+}
+
+void dos_put_byte(DosBuf *db, byte b) {
+  dos_putc(db, '1');
+  for (int i = 7; i >= 0; --i)
+    dos_putc(db, (b >> i) & 1 ? '1' : '0');
+}
+
+void dos_rewind(DosBuf *db) {
+  db->p = 0;
+  printf("dos_rewind left: %ld\n", db->len - db->p);
+}
+
+void dos_reset(DosBuf *db) {
+  printf("dosbuf size: %ld\n", (sizeof db->buf));
+  memset(db->buf, 0, sizeof db->buf);
+  db->len = 0;
+  db->p = 0;
+}
+
+int dos_hasdata(DosBuf *db) {
+  return db->len > 0;
+}
+
+int dos_read(DosBuf* db) {
+  if (db->p < db->len) {
+    return db->buf[db->p++] - '0';
+  } else {
+    return -1;
+  }
+}
 
 word read_checksum(byte* buf, int nbytes) {
   word res = 0;
@@ -41,12 +69,6 @@ word calc_checksum(byte* buf, int nbytes) {
 
 }
 
-void fput_byte2bit9(byte b, FILE* fp) {
-  fputc('1', fp);
-  for (int i = 7; i >= 0; --i)
-    fputc((b >> i) & 1 ? '1' : '0', fp);
-}
-
 byte bit9ToByte(byte* buf) {
   byte res = 0;
   buf++;
@@ -61,12 +83,13 @@ byte get_command_code(byte* buf) {
   return bit9ToByte(p);
 }
 
-void build_list_fcb(char* filename) {
+void build_list_fcb(DosBuf *db) {
   byte out[0x80 + 2]; // fcb + checksum
   byte *outp = out;
   glob_t globbuf;
 
   memset(out, 0, 0x80 + 2);
+  dos_reset(db);
 
   int result = glob("*.TAP", 0, 0, &globbuf);
   if (result == 0) {
@@ -86,18 +109,16 @@ void build_list_fcb(char* filename) {
   *outp++ = cs % 256;
   *outp++ = cs / 256;
 
-  // Now create a temporary TAP file.
-  FILE *fp = fopen(filename, "wb");
-  for (int i = 0; i < 0x55f0; ++i) fputc('0', fp);
-  for (int i = 0; i < 0x28; ++i) fputc('1', fp);
-  for (int i = 0; i < 0x28; ++i) fputc('0', fp);
-  fputc('1', fp);
-  for (int i = 0; i < 0x80 + 2; ++i) fput_byte2bit9(out[i], fp);
-  fputc('1', fp);
-  for (int i = 0; i < 0x100; ++i) fputc('0', fp);
-  for (int i = 0; i < 0x80 + 2; ++i) fput_byte2bit9(out[i], fp);
-  fputc('1', fp);
-  fclose(fp);
+  for (int i = 0; i < 0x55f0; ++i) dos_putc(db, '0');
+  for (int i = 0; i < 0x28; ++i) dos_putc(db, '1');
+  for (int i = 0; i < 0x28; ++i) dos_putc(db, '0');
+  dos_putc(db, '1');
+  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, out[i]);
+  dos_putc(db, '1');
+  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
+  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, out[i]);
+  dos_putc(db, '1');
+  dos_rewind(db);
 }
 
 void set_filename(byte* buf, char* filename) {
@@ -110,23 +131,23 @@ void set_filename(byte* buf, char* filename) {
   strcat(filename, ".TAP");
 }
 
-int exec_doscmd(byte *buf, Cassette *cas, Uint32 start_time) {
+int exec_doscmd(DosBuf *db, Cassette *cas, Uint32 start_time) {
   byte filename[16+1];
-  byte cmd = get_command_code(buf);
+  byte cmd = get_command_code(db->buf);
   int res = 0;
 
   switch (cmd) {
   case DOSCMD_VIEW:
-    build_list_fcb(DOS_LISTFILE);
-    if (cas->rfp) fclose(cas->rfp);
-    if ((cas->rfp = fopen(DOS_LISTFILE, "rb")) != NULL) {
-      cas->button = CAS_PLAY;
-      cas->startTime = start_time;
-      res = 1;
-    }
+    /* Prepare the response fcb in |db|. */
+    build_list_fcb(db);
+
+    cas->button = CAS_PLAY;
+    cas->startTime = start_time;
+    res = 1;
     break;
   case DOSCMD_LOAD:
-    set_filename(buf, filename);
+    set_filename(db->buf, filename);
+    dos_reset(db);
     if (cas->rfp) fclose(cas->rfp);
     cas->rfp = fopen(filename, "rb");
 
@@ -140,19 +161,22 @@ int exec_doscmd(byte *buf, Cassette *cas, Uint32 start_time) {
 
     break;
   case DOSCMD_SAVE:
-    set_filename(buf, filename);
+    set_filename(db->buf, filename);
+    dos_reset(db);
     if ((cas->wfp = fopen(filename, "wb")) != NULL) {
       cas->button = CAS_REC;
       res = 1;
     }
     break;
   case DOSCMD_DEL:
-    set_filename(buf, filename);
+    set_filename(db->buf, filename);
+    dos_reset(db);
     remove(filename);
     /* fall through */
   default:
     /* No cmd received. Emulate STOP button. */
     cas->button = CAS_STOP;
+    dos_reset(db);
     break;
   }
   return res;

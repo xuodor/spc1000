@@ -70,7 +70,7 @@ sudo apt-get install libsdl2-dev
 ## Supporting tape-based DOS
 [The latest version](https://github.com/xuodor/spc1000/commit/7092f03a10388dd04bbae98d172994470d139a25) supports disk-like operating using cassette tape I/O. Check out the demo:
 
-[![SPC-1000 tape DOS](https://img.youtube.com/vi/LE_BQTkdAO0PlgUK/0.jpg)](https://youtu.be/aYlQKWCQPE0?si=LE_BQTkdAO0PlgUK)
+[![SPC-1000 tape DOS](spc1000-tdos.png)](https://youtu.be/aYlQKWCQPE0?si=LE_BQTkdAO0PlgUK)
 
 ## Credits
 
