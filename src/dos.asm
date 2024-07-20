@@ -3,6 +3,7 @@ FSAVE:      EQU 0080H
 FLOAD:      EQU 0114H
 FILEMOD:    EQU 1396H
 FILENAM:    EQU 1397H
+MTEXEC:     EQU 13ACH
 IO6000:     EQU 11E9H
 DEPRT:      EQU 07F3H
 TABPRT:     EQU 0802H
@@ -116,38 +117,23 @@ DOS:
 DOSVIEW:
     LD A,DOSVFG
     CALL DOSREQ
-    CALL FLOAD
+
+    ;; Load the result.
+    ;; Do not output 'FOUND:/LOADING:'
+    LD A,0C9h                   ; RET
+    LD (38A7h),A
+    CALL LOAD
+    LD A,11h
+    LD (38A7h),A
+
     LD A,(FILECNT)
     OR A
     JR Z,DOSEND
-    LD B,A
-    LD DE,FILEBUF
+
+    LD HL,DOSEND
     PUSH HL
-
-    ;; Output 4 files in a row
-DOSPRT:
-    CALL DEPRT
-    CALL TABPRT
-
-    ;; DE += 8
-    LD A,8
-    ADD A,E
-    LD E,A
-    ADC A,D
-    SUB E
-    LD D,A
-
-    DJNZ DOSPRT
-
-    ;; Clear FIB
-    LD HL,FILEMOD
-    XOR A
-    LD B,80h
-DOSPRT1:
-    LD (HL),A
-    INC HL
-    DJNZ DOSPRT1
-    POP HL
+    LD HL,(MTEXEC)
+    JP (HL)
 
     ;; Send an empty command to finish
 DOSEND:

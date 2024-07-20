@@ -8,3 +8,7 @@ local.properties
 external/
 .idea
 gen/
+*.*~
+*.TAP
+src/.csearchindex
+tool/build_img

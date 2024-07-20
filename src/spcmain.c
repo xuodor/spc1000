@@ -12,6 +12,7 @@
 #include "Tables.h"
 #include "spc1000.h"
 #include "SDL_log.h"
+#include "MC6847.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -24,7 +25,7 @@
 #include "spckey.h" // keyboard definition
 #include "dos.h"
 
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 #define NONE 0
 #define EDGE 1
@@ -724,7 +725,7 @@ void ProcessKeyDown(SDLKey sym) {
     if (KeyHashTab[index].keys[i].sym == sym) {
       spc.IO.keyMatrix[KeyHashTab[index].keys[i].keyMatIdx] &=
           ~(KeyHashTab[index].keys[i].keyMask);
-#ifdef DEBUG_MODE
+#ifdef DEBUG_MODE2
       printf("%08x [%s] key down\n", KeyHashTab[index].keys[i].sym,
              KeyHashTab[index].keys[i].keyName);
 #endif
@@ -745,7 +746,7 @@ void ProcessKeyUp(SDLKey sym) {
     if (KeyHashTab[index].keys[i].sym == sym) {
       spc.IO.keyMatrix[KeyHashTab[index].keys[i].keyMatIdx] |=
           (KeyHashTab[index].keys[i].keyMask);
-#ifdef DEBUG_MODE
+#ifdef DEBUG_MODE2
       printf("%08x [%s] key up\n", KeyHashTab[index].keys[i].sym,
              KeyHashTab[index].keys[i].keyName);
 #endif

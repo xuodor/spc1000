@@ -2,8 +2,9 @@
 #define SPC1000_H
 
 #include "AY8910.h"
-#include "MC6847.h"
 #include "Z80.h"
+
+typedef unsigned long uint32;
 
 /**
  * Cassette structure for tape processing, included in the SPCIO
@@ -13,11 +14,11 @@ typedef struct {
   int pulse; // Motor Pulse (0->1->0) causes motor state to flip
   int button;
   int rdVal;
-  Uint32 startTime;
-  Uint32 cnt0, cnt1;
+  uint32 startTime;
+  uint32 cnt0, cnt1;
 
   int wrVal;
-  Uint32 wrRisingT; // rising time
+  uint32 wrRisingT; // rising time
 
   FILE *wfp;
   FILE *rfp;
@@ -52,7 +53,7 @@ typedef struct {
   byte RAM[65536]; // RAM area
   byte ROM[32768]; // ROM area
   SPCIO IO;
-  Uint32 tick;
+  uint32 tick;
   int turbo;
   int refrTimer;   // timer for screen refresh
   int refrSet;     // init value for screen refresh timer

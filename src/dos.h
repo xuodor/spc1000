@@ -10,15 +10,18 @@
 #define MIN(x,y) (((x) <= (y)) ? (x) : (y))
 #define MAX_FILES 15
 #define FIB_TAP_SIZE 24679
+#define MAX_BODY_TAP (0x2af8+0x14+0x14+(1+256+2)*9+1)
 #define FNF_TAP "fnf.bin"
 
+typedef unsigned long uint32;
+
 typedef struct {
-  byte buf[FIB_TAP_SIZE];
+  byte buf[FIB_TAP_SIZE + MAX_BODY_TAP];
   size_t len;
   int p;
 } DosBuf;
 
-int exec_doscmd(DosBuf *db, Cassette *cas, Uint32 start_time);
+int exec_doscmd(DosBuf *db, Cassette *cas, uint32 start_time);
 void dos_putc(DosBuf *db, byte b);
 void dos_put_byte(DosBuf *db, byte b);
 void dos_rewind(DosBuf *db);
