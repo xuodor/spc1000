@@ -7,6 +7,8 @@ MTEXEC:     EQU 13ACH
 IO6000:     EQU 11E9H
 DEPRT:      EQU 07F3H
 TABPRT:     EQU 0802H
+RTBLOD:     EQU 39A1h
+TPRDER:     EQU 3969h
 
 ;;; BASIC
 IFCALL:     EQU 1736H
@@ -34,7 +36,10 @@ DOSCMDF:    EQU 1396H
 FILECNT:    EQU 1396H
 FILEBUF:    EQU 1397H
 
-ORG ERRTXT
+    incbin 'src/spcall.rom'
+
+    seek ERRTXT
+    org ERRTXT
 
     DEFB 00H                    ;1
     DEFM "E:NEXT"
@@ -237,15 +242,36 @@ DOSREQ1:
     LD (DE),A
     RET
 
+;;; Lets assembly programs run automatically after loading.
+;;; Setting MTEXEC in FIB to the right start address.
+MLEXEC:
+    JP C,TPRDER
+
+    LD HL,(MTEXEC)
+    LD A,H
+    OR L
+    JP Z,RTBLOD
+    LD DE,RTBLOD
+    PUSH DE
+    JP (HL)
+
 ;;; Redirect LET to DOS
-ORG 2F98H
+    seek 2F98H
+    org 2F98H
     DEFW DOS
 
 ;;; Update the reference to UDLMES
 
-ORG 3F6BH
+    seek 3F6BH
+    org 3f6BH
     LD DE,UDLMES2
 
 ;;; Rename LET to DOS
-ORG 679BH
+    seek 679BH
+    org 679BH
     DEFB    44H, 4FH, 0D3H                 ; DOS
+
+;;; Enable ASM program to autorun
+    seek 39A7h
+    org 39a7h
+    JP MLEXEC
