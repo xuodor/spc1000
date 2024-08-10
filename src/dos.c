@@ -13,13 +13,11 @@ void ResetCassette(Cassette *cas);
 
 /*
  * Handles disk-like operations with cassette interface.
- * TODO:
- *   - Dynamically generate fnf/cancel.bin, not loading from disk.
  */
 
 typedef struct {
   Cassette *cas;
-  uint32 start_time;
+  DosBuf *dos_buf;
 } LoadData;
 
 LoadData load_params_;
@@ -95,6 +93,34 @@ byte get_command_code(byte* buf) {
   return _9bits_to_byte(p);
 }
 
+void dos_generate_tap_bits(DosBuf *db, byte *fcb, byte *body, size_t body_len) {
+  dos_reset(db);
+
+  /* FCB */
+  for (int i = 0; i < 0x55f0; ++i) dos_putc(db, '0');
+  for (int i = 0; i < 0x28; ++i) dos_putc(db, '1');
+  for (int i = 0; i < 0x28; ++i) dos_putc(db, '0');
+  dos_putc(db, '1');
+  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
+  dos_putc(db, '1');
+  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
+  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
+  dos_putc(db, '1');
+
+  /* Body */
+  for (int i = 0; i < 0x2af8; ++i) dos_putc(db, '0');
+  for (int i = 0; i < 0x14; ++i) dos_putc(db, '1');
+  for (int i = 0; i < 0x14; ++i) dos_putc(db, '0');
+  dos_putc(db, '1');
+  for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
+  dos_putc(db, '1');
+  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
+  for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
+  dos_putc(db, '1');
+
+  dos_rewind(db);
+}
+
 void dos_build_list_resp(DosBuf *db) {
   /* fcb + checksum. The code in the extension area can be */
   /* found in fcb.asm. */
@@ -166,31 +192,31 @@ void dos_build_list_resp(DosBuf *db) {
   fcb[0x80] = fcs / 256; /* maybe swap? */
   fcb[0x81] = fcs % 256;
 
-  dos_reset(db);
+  dos_generate_tap_bits(db, fcb, body, body_len);
+}
 
-  /* FCB */
-  for (int i = 0; i < 0x55f0; ++i) dos_putc(db, '0');
-  for (int i = 0; i < 0x28; ++i) dos_putc(db, '1');
-  for (int i = 0; i < 0x28; ++i) dos_putc(db, '0');
-  dos_putc(db, '1');
-  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
-  dos_putc(db, '1');
-  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
-  for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
-  dos_putc(db, '1');
+void dos_build_load_resp(DosBuf *db, byte *msg, byte *data, size_t body_len) {
+  byte *fcb = (byte *)malloc(0x80 + 2);
+  byte *body = (byte *)malloc(body_len + 2);
+  memset(fcb, 0, 0x80 + 2);
+  memcpy(body, data, body_len);
 
-  /* Body */
-  for (int i = 0; i < 0x2af8; ++i) dos_putc(db, '0');
-  for (int i = 0; i < 0x14; ++i) dos_putc(db, '1');
-  for (int i = 0; i < 0x14; ++i) dos_putc(db, '0');
-  dos_putc(db, '1');
-  for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
-  dos_putc(db, '1');
-  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
-  for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
-  dos_putc(db, '1');
+  fcb[0] = 0x01; /* attr (FILMOD) */
+  strncpy(fcb+1, msg, 16);
+  fcb[18] = body_len % 256; /* length (MTBYTE) */
+  fcb[19] = body_len / 256;
+  word fcs = calc_checksum(fcb, 0x80);
+  fcb[0x80] = fcs / 256; /* maybe swap? */
+  fcb[0x81] = fcs % 256;
 
-  dos_rewind(db);
+  word bcs = calc_checksum(body, body_len);
+  body[body_len  ] = bcs / 256; /* maybe swap? */
+  body[body_len+1] = bcs % 256;
+
+  dos_generate_tap_bits(db, fcb, body, body_len);
+
+  free(body);
+  free(fcb);
 }
 
 void osd_set_filename_(byte* buf, char* filename) {
@@ -212,20 +238,17 @@ int dos_max_reached() {
 
 void dos_load(byte *filename) {
   Cassette *cas = load_params_.cas;
-  uint32 start_time = load_params_.start_time;
+  if (cas->rfp) FCLOSE(cas->rfp);
   if (filename[0] != '\0') {
-    if (cas->rfp) FCLOSE(cas->rfp);
     cas->rfp = fopen(filename, "rb");
 
     /* File not found. Notify user with an error. */
     if (!cas->rfp) {
-      osd_toast("FILE NOT FOUND", 0, 0);
-      cas->rfp = fopen(FNF_TAP, "rb");
+      dos_build_load_resp(load_params_.dos_buf, "FILE NOT FOUND", "\0\0", 2);
     }
   } else {
     DLOG("load canceled");
-    if (cas->rfp) FCLOSE(cas->rfp);
-    cas->rfp = fopen(CANCEL_TAP, "rb");
+    dos_build_load_resp(load_params_.dos_buf, "CANCELED", "\0\0", 2);
   }
   cas->button = CAS_PLAY;
   cas->startTime = spc_cas_start_time();
@@ -254,7 +277,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     dos_reset(db);
     if (cas->rfp) FCLOSE(cas->rfp);
     load_params_.cas = cas;
-    load_params_.start_time = start_time;
+    load_params_.dos_buf = db;
     if (filename[0] == '\0') {
       if (!osd_dialog_on()) osd_open_dialog("LOAD", "*.TAP", dos_load);
     } else {
