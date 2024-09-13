@@ -245,6 +245,8 @@ void dos_load(byte *filename) {
     /* File not found. Notify user with an error. */
     if (!cas->rfp) {
       dos_build_load_resp(load_params_.dos_buf, "FILE NOT FOUND", "\0\0", 2);
+    } else {
+      printf("open [%s]:%p\n", filename, cas->rfp);
     }
   } else {
     DLOG("load canceled");
@@ -254,6 +256,8 @@ void dos_load(byte *filename) {
   cas->startTime = spc_cas_start_time();
   ResetCassette(cas);
 }
+
+int noname_load_ = 0;
 
 /**
  * Executes the received dos command.
@@ -277,13 +281,21 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     dos_reset(db);
     load_params_.cas = cas;
     load_params_.dos_buf = db;
+    printf("filename:[%s] rfp:%p\n", filename, cas->rfp);
     if (filename[0] == '\0') {
       if (!cas->rfp) {
-        if (!osd_dialog_on()) osd_open_dialog("LOAD", "*.TAP", dos_load);
+        if (!osd_dialog_on()) {
+          osd_open_dialog("LOAD", "*.TAP", dos_load);
+        }
+      } else {
+        cas->button = CAS_PLAY;
+        noname_load_ = 1;
       }
     } else {
+      printf("loading\n");
       if (cas->rfp) FCLOSE(cas->rfp);
       dos_load(filename);
+      noname_load_ = 0;
     }
     break;
   case DOSCMD_SAVE:

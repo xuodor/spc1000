@@ -403,7 +403,7 @@ int ReadVal(void) {
     c = fgetc(spc.IO.cas.rfp);
     if (c == EOF) {
       if (!EOF_flag) {
-        DLOG("EOF\n");
+        printf("EOF\n");
         EOF_flag = 1;
       }
       c = -1;
@@ -477,10 +477,11 @@ uint32 spc_cas_start_time() {
   return (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
 }
 
+extern int noname_load_;
+
 /*************************************************************/
 /** Output I/O Processing                                   **/
 /*************************************************************/
-
 /**
  * Put a value on Z-80 out port
  * @param Port 0x0000~0xffff port address
@@ -516,19 +517,16 @@ void OutZ80(register word Port, register byte Value) {
           spc.IO.cas.pulse = 0;
           if (spc.IO.cas.motor) {
             spc.IO.cas.motor = 0;
-            DLOG("Motor Off\n");
+            printf("Motor Off dos:%d\n", spc.IO.cas.dos);
             if (spc.IO.cas.dos) {
-              if (spc.IO.cas.rfp)
-                FCLOSE(spc.IO.cas.rfp);
-              if (spc.IO.cas.wfp)
-                FCLOSE(spc.IO.cas.wfp);
+              //if (spc.IO.cas.rfp) FCLOSE(spc.IO.cas.rfp);
+              if (spc.IO.cas.wfp) FCLOSE(spc.IO.cas.wfp);
             }
           } else {
             spc.IO.cas.motor = 1;
-            DLOG("Motor On\n");
-            spc.IO.cas.startTime =
-                (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-            ResetCassette(&spc.IO.cas);
+            printf("Motor On\n");
+            spc.IO.cas.startTime = spc_cas_start_time();
+            //ResetCassette(&spc.IO.cas);
           }
         }
       }
@@ -539,6 +537,7 @@ void OutZ80(register word Port, register byte Value) {
 
     if (Value & 0x10) {  // DOS signal
       if (!spc.IO.cas.dos) {
+        printf("doson\n");
         spc.IO.cas.dos = 1;
         spc.IO.cas.button = CAS_REC;
         dos_reset(&dosbuf_);
@@ -547,6 +546,7 @@ void OutZ80(register word Port, register byte Value) {
         }
       }
     } else if (spc.IO.cas.dos) {
+      printf("dosoff\n");
       spc.IO.cas.dos = 0;
       if (spc.IO.cas.wfp) {
         FCLOSE(spc.IO.cas.wfp);

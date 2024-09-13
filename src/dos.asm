@@ -2,8 +2,8 @@
 FSAVE:      EQU 0080H
 FLOAD:      EQU 0114H
 MLOAD:      EQU 0134H
-FILEMOD:    EQU 1396H
-FILENAM:    EQU 1397H
+FILMOD:     EQU 1396H
+FILNAM:     EQU 1397H
 MTEXEC:     EQU 13ACH
 IO6000:     EQU 11E9H
 DEPRT:      EQU 07F3H
@@ -37,9 +37,6 @@ FGSAVE:     EQU 0D3H
 FGLOAD:     EQU 0D4H
 FGDIR:      EQU 0D5H
 FGDEL:      EQU 0D6H
-
-;;; DOS REQUEST
-DOSCMDF:    EQU 1396H
 
 ;;; DOSV RESPONSE
 FILECNT:    EQU 1396H
@@ -129,20 +126,6 @@ DIR:
     POP HL
     RET
 
-DOSEND:
-    XOR A
-    JR DOSREQ
-
-    ;; Load files
-DOSLOAD:
-    LD A,FGLOAD
-    CALL DOSREQ
-    JP FLOAD
-    ;; Skip DOSEND. In order to handle multi-content file
-    ;; loading, DOSL should not stop or close the present
-    ;; loading stream. User is required to hit F10 (STOP)
-    ;; to manually close it.
-
     ;; Save files
 DOSSAVE:
     XOR A
@@ -153,7 +136,9 @@ DOSCMB:
     JP DOSREQ
 DOSSAV1:
     JP C,CBREAK
-    JR DOSEND
+DOSEND:
+    XOR A
+    JR DOSREQ
 
     ;; Delete files. Utilize CWOPEN to set the filename
     ;; to delete.
@@ -174,7 +159,8 @@ DOSDEL:
 
     ;; Send DOS command to cassette
 DOSREQ:
-    LD (DOSCMDF),A
+    LD (FILMOD),A
+    PUSH BC
     PUSH AF
     LD BC,SMODE
     LD A,(IO6000)
@@ -185,7 +171,7 @@ DOSREQ:
     OR A
     JR Z, DOSREQ1
 
-    ;; Do not display WRITING: <FILENAME>
+    ;; Do not display WRITING: <FILNAME>
     LD DE,009Fh
     LD A,18h
     LD (DE),A
@@ -208,6 +194,7 @@ DOSREQ1:
     LD A,11h
     INC DE
     LD (DE),A
+    POP BC
     RET
 
 ;;; Lets assembly programs run automatically after loading.
@@ -228,7 +215,7 @@ MLEXEC:
     org 2F98H
     DEFW DIR
 
-;;; Rewrite LOAD command processing
+;;; Rewrite CROPEN for new LOAD command processing
     seek 3865H
     org 3865H
 CROPEN:
@@ -236,7 +223,7 @@ CROPEN:
     OR A
     JP NZ,FILEER
     LD (LOADFN),A
-    LD (FILENAM),A
+    LD (FILNAM),A
     INC A
     LD (FILEFG),A
     CALL BCFTCH
@@ -254,15 +241,14 @@ LODIFC:
     LD B,0
     LD C,A
     EX DE,HL
-    LD DE,FILENAM
-LDFNTR:
+    LD DE,FILNAM
     LDIR
     XOR A
     LD (DE),A
-    LD A,FGLOAD
-    CALL DOSREQ
     POP BC
 LOADST:
+    LD A,FGLOAD
+    CALL DOSREQ
     NOP
     NOP
     CALL FLOAD
