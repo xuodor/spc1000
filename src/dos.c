@@ -275,17 +275,20 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   case DOSCMD_LOAD:
     osd_set_filename_(db->buf, filename);
     dos_reset(db);
-    if (cas->rfp) FCLOSE(cas->rfp);
     load_params_.cas = cas;
     load_params_.dos_buf = db;
     if (filename[0] == '\0') {
-      if (!osd_dialog_on()) osd_open_dialog("LOAD", "*.TAP", dos_load);
+      if (!cas->rfp) {
+        if (!osd_dialog_on()) osd_open_dialog("LOAD", "*.TAP", dos_load);
+      }
     } else {
+      if (cas->rfp) FCLOSE(cas->rfp);
       dos_load(filename);
     }
     break;
   case DOSCMD_SAVE:
     osd_set_filename_(db->buf, filename);
+    if (filename[0] == '\0') strcpy(filename, "NONAME.TAP");
     if (access(filename, F_OK) == 0) {
       /* TODO: Prevent overwrite. For now we always allow it */
     }

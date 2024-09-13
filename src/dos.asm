@@ -1,6 +1,7 @@
 ;;; IOCS
 FSAVE:      EQU 0080H
 FLOAD:      EQU 0114H
+MLOAD:      EQU 0134H
 FILEMOD:    EQU 1396H
 FILENAM:    EQU 1397H
 MTEXEC:     EQU 13ACH
@@ -14,20 +15,28 @@ TPRDER:     EQU 3969h
 IFCALL:     EQU 1736H
 SERROR:     EQU 173AH
 FILEER:     EQU 183EH
+FILEFG:     EQU 3383H
 SAVE:       EQU 3ABBH
+CBREAK:     EQU 3A26H
+CBRSHM1:    EQU 3B0FH
+LOADST2:    EQU 389DH
+LDFNTR2:    EQU 3892H
 LOAD:       EQU 392CH
 SMODE:      EQU 6000H
 CWOPEN:     EQU 3A5DH
 NULFNM:     EQU 3A98H
+STREXX:     EQU 459DH
+BCFTCH:     EQU 25C4H
 SETLFN:     EQU 3A69H
 SETLFNB:    EQU 3A9CH
 ERRTXT:     EQU 69B2H
+LOADFN:     EQU 38C3H
 
 ;;; DOS
-DOSSFG:     EQU 0D3H
-DOSLFG:     EQU 0D4H
-DOSVFG:     EQU 0D5H
-DOSDFG:     EQU 0D6H
+FGSAVE:     EQU 0D3H
+FGLOAD:     EQU 0D4H
+FGDIR:      EQU 0D5H
+FGDEL:      EQU 0D6H
 
 ;;; DOS REQUEST
 DOSCMDF:    EQU 1396H
@@ -69,7 +78,7 @@ UDLMES2:                        ;8
     DEFB 00H                    ;13
     DEFM "E:TYPE MISMATCH"
     DEFB 00H                    ;14
-    DEFM "HUBASIC"
+    DEFM "HB"
     DEFB 00H                    ;15
     DEFM "E:STR 2LONG"
     DEFB 00H                    ;16
@@ -106,90 +115,61 @@ UDLMES2:                        ;8
     DEFM "E:FILE"
     DEFB 00H
 
-DOS:
-    LD A,(HL)
+    ;; Directory list
+DIR:
     INC HL
-    CP 4CH                       ;L
-    JR Z,DOSLOAD
-    CP 53H                       ;S
-    JR Z,DOSSAVE
-    CP 44h                       ;D
-    JR Z,DOSDEL
-    CP 56H                       ;V
-    JP NZ,SERROR
-
-    ;; View files
-DOSVIEW:
-    LD A,DOSVFG
+    PUSH HL
+    LD A,FGDIR
     CALL DOSREQ
 
-    ;; Load the result.
-    ;; Do not output 'FOUND:/LOADING:'
-    LD A,0C9h                   ; RET
-    LD (38A7h),A
-    CALL LOAD
-    LD A,11h
-    LD (38A7h),A
+    CALL FLOAD
+    CALL MLOAD
+    CALL MLEXEC
+    CALL DOSEND
+    POP HL
+    RET
 
-    ;; Send an empty command to finish
 DOSEND:
     XOR A
     JR DOSREQ
 
     ;; Load files
 DOSLOAD:
-    CALL DOSFLN
-
-    LD A,DOSLFG
+    LD A,FGLOAD
     CALL DOSREQ
-
+    JP FLOAD
     ;; Skip DOSEND. In order to handle multi-content file
     ;; loading, DOSL should not stop or close the present
     ;; loading stream. User is required to hit F10 (STOP)
     ;; to manually close it.
-    JP LOAD
 
     ;; Save files
 DOSSAVE:
-    ;; If SAVEM, adjust the buf before getting filename
-    PUSH HL
-    LD A,(HL)
-    CP 4Dh                      ; M
-    JR NZ,DOSSV1
-    INC HL
-DOSSV1:
-    CALL DOSFLN
-    JP Z,FILEER
-    POP HL
-    LD A,DOSSFG
-    CALL DOSREQ
-    CALL SAVE
+    XOR A
+    LD (DE),A
+    DEFB 3Eh                    ; LD A,
+DOSCMB:
+    DEFB FGSAVE
+    JP DOSREQ
+DOSSAV1:
+    JP C,CBREAK
     JR DOSEND
 
-    ;; Delete files
+    ;; Delete files. Utilize CWOPEN to set the filename
+    ;; to delete.
 DOSDEL:
-    CALL DOSFLN
-    JP Z,FILEER
+    XOR A
+    LD (FILEFG),A
+    LD A,FGDEL
+    LD (DOSCMB),A
+    CALL CWOPEN
 
-    LD A,DOSDFG
-    CALL DOSREQ
-    RET
-
-    ;; Set filename to FIB
-DOSFLN:
-    LD A,0C9H                   ; RET
-    LD (SETLFNB),A
-    CALL SETLFN
-    LD A,21H
-    LD (SETLFNB),A
-
-    ;; Restore buf pointer
+    ;; Restore text pointer
     LD H,B
     LD L,C
 
-    ;; Check empty filename
-    LD A,(FILENAM)
-    OR A
+    LD A,FGSAVE
+    LD (DOSCMB),A
     RET
 
     ;; Send DOS command to cassette
@@ -243,10 +223,60 @@ MLEXEC:
     PUSH DE
     JP (HL)
 
-;;; Redirect LET to DOS
+;;; Redirect LET to DIR
     seek 2F98H
     org 2F98H
-    DEFW DOS
+    DEFW DIR
+
+;;; Rewrite LOAD command processing
+    seek 3865H
+    org 3865H
+CROPEN:
+    LD A,(FILEFG)
+    OR A
+    JP NZ,FILEER
+    LD (LOADFN),A
+    LD (FILENAM),A
+    INC A
+    LD (FILEFG),A
+    CALL BCFTCH
+    DEC BC
+    OR A
+    JR Z,LOADST
+    CP 03AH
+    JR Z,LOADST
+    CALL STREXX
+    DEC BC
+    PUSH BC
+    CP 17
+LODIFC:
+    JP NC,IFCALL
+    LD B,0
+    LD C,A
+    EX DE,HL
+    LD DE,FILENAM
+LDFNTR:
+    LDIR
+    XOR A
+    LD (DE),A
+    LD A,FGLOAD
+    CALL DOSREQ
+    POP BC
+LOADST:
+    NOP
+    NOP
+    CALL FLOAD
+
+
+;;; SAVE
+    ;; Hook into SAVE command
+    seek NULFNM
+    org NULFNM
+    call DOSSAVE
+    ;; Stop button at the end of SAVE
+    seek CBRSHM1
+    org CBRSHM1
+    CALL DOSSAV1
 
 ;;; Update the reference to UDLMES
 
@@ -254,10 +284,21 @@ MLEXEC:
     org 3f6BH
     LD DE,UDLMES2
 
-;;; Rename LET to DOS
+;;; Rename LET to DIR
     seek 679BH
     org 679BH
-    DEFB    44H, 4FH, 0D3H                 ; DOS
+    DEFB    44H, 49H, 0D2H                 ; DOS
+
+;;; Define DEL command entry
+    seek 2FCEH
+    org 2FCEH
+    DEFW DOSDEL
+
+;;; DEL cmd. ERROR -> ERR
+    seek 680CH
+    org 680CH
+    DEFB 44H, 45H, 0CCH         ; DEL
+    DEFB 45H, 52H, 0D2H         ; ERR
 
 ;;; Enable ASM program to autorun
     seek 39A7h
