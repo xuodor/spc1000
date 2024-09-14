@@ -206,6 +206,8 @@ CWOPEN:
     JP NZ,FILEER
     LD A,2
     LD (FILEFG),A
+    LD A,16H
+    LD (FILMOD),A
     LD C,L
     LD B,H
     call SETFN
