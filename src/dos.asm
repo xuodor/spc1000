@@ -77,7 +77,6 @@ CROPEN:
     LD A,FGLOAD
     CALL DOSREQ
     CALL FLOAD
-    JP C,BREAK
     CALL CR2
 
     PUSH BC
@@ -134,16 +133,21 @@ DIR:
     POP HL
     RET
 
+CLRFN:
+    XOR A
+    LD (FILNAM),A
+    RET
+
 ;;; Read program name from the command param and set to FIB.
 ;;; Used by LOAD/SAVE <PROGRAM>
 SETFN:
+    CALL CLRFN
     CALL BCFTCH
     DEC BC
-    LD DE,FILNAM
     OR A
-    JR Z,NULFN
+    RET Z
     CP 03AH
-    JR Z,NULFN
+    RET Z
     CALL STREXX
     DEC BC
     OR A
@@ -157,7 +161,6 @@ SETFN:
     LD DE,FILNAM
     LDIR
     POP BC
-NULFN:
     XOR A
     LD (DE),A
     RET
@@ -192,6 +195,11 @@ ROPND:
     org 39a7h
     JR C,TPRDER
     JP MLEXEC
+
+;;; Unused msg LFOUM to 'NONAME'
+    seek 3A43H
+    org 3A43H
+    DEFM 'NONAME'
 
 ;;; CWOPEN updated to use SETFN
     seek 3A5DH
@@ -237,7 +245,7 @@ DOSDEL:
     LD (FILEFG),A
     LD A,FGDEL
     LD (DOSCMF),A
-    CALL CWOPEN                 ; Use CWOPEN to fill out FIB
+    CALL CWOPEN                 ; Use CWOPEN to run DEL
 
     LD A,(FILNAM)
     OR A
