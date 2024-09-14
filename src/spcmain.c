@@ -526,7 +526,7 @@ void OutZ80(register word Port, register byte Value) {
             spc.IO.cas.motor = 1;
             printf("Motor On\n");
             spc.IO.cas.startTime = spc_cas_start_time();
-            //ResetCassette(&spc.IO.cas);
+            ResetCassette(&spc.IO.cas);
           }
         }
       }

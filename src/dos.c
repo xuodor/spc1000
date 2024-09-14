@@ -288,6 +288,12 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
           osd_open_dialog("LOAD", "*.TAP", dos_load);
         }
       } else {
+        printf("eof: %d\n", feof(cas->rfp));
+        if (feof(cas->rfp)) {
+          dos_build_load_resp(load_params_.dos_buf, "READ ERROR", "\0\0", 2);
+          // TODO: After this, force the stop button to not repeat this message
+          // upon subsequent LOAD command.
+        }
         cas->button = CAS_PLAY;
         noname_load_ = 1;
       }
@@ -323,6 +329,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   default:
     /* No cmd received. Emulate STOP button. */
     cas->button = CAS_STOP;
+    if (cas->rfp) FCLOSE(cas->rfp);
     break;
   }
   return res;
