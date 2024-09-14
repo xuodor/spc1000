@@ -7,9 +7,7 @@
 #include "Z80.h"
 #include "dos.h"
 #include "osd.h"
-
-uint32 spc_cas_start_time();
-void ResetCassette(Cassette *cas);
+#include "cassette.h"
 
 /*
  * Handles disk-like operations with cassette interface.
@@ -253,7 +251,7 @@ void dos_load(byte *filename) {
     dos_build_load_resp(load_params_.dos_buf, "CANCELED", "\0\0", 2);
   }
   cas->button = CAS_PLAY;
-  cas->startTime = spc_cas_start_time();
+  cas->startTime = cas_start_time();
   ResetCassette(cas);
 }
 

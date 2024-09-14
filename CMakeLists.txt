@@ -8,6 +8,7 @@ set(SOURCE_FILES \\
     src/Debug.c \\
     src/Z80SPC.c \\
     src/cgbuf.c \\
+    src/cassette.c \\
     src/dos.c \\
     src/osd.c \\
     src/rom.c)

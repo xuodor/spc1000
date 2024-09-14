@@ -5,8 +5,7 @@
  * @date 2005~2007.1
  */
 
-#ifndef __SPC_COMMON_H__
-#define __SPC_COMMON_H__
+#pragma once
 
 typedef struct
 {
@@ -21,6 +20,8 @@ typedef struct
 } SPCConfig;
 
 typedef unsigned char byte;
+typedef unsigned long uint32;
+typedef int bool;
 
 #define SPCCOL_OLDREV		0
 #define SPCCOL_NEW1			1
@@ -46,4 +47,4 @@ int null_printf(const char *format, ...);
 #define DLOG null_printf
 #endif
 
-#endif
+extern uint32 cas_start_time();

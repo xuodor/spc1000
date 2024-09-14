@@ -1,7 +1,8 @@
 #ifndef DOS_H_
 #define DOS_H_
 
-#include "spc1000.h"
+#include "common.h"
+#include "cassette.h"
 
 #define DOSCMD_SAVE 0xd3
 #define DOSCMD_LOAD 0xd4

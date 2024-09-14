@@ -1,30 +1,8 @@
-#ifndef SPC1000_H
-#define SPC1000_H
+#pragma once
 
 #include "AY8910.h"
 #include "Z80.h"
-
-typedef unsigned long uint32;
-typedef int bool;
-
-/**
- * Cassette structure for tape processing, included in the SPCIO
- */
-typedef struct {
-  int motor; // Motor Status
-  int pulse; // Motor Pulse (0->1->0) causes motor state to flip
-  int button;
-  int rdVal;
-  uint32 startTime;
-  uint32 cnt0, cnt1;
-
-  int wrVal;
-  uint32 wrRisingT; // rising time
-
-  FILE *wfp;
-  FILE *rfp;
-  int dos;  // DOS command signal
-} Cassette;
+#include "cassette.h"
 
 /**
  * SPC IO structure, registers and memories mappted to IO space
@@ -60,9 +38,3 @@ typedef struct {
   int refrSet;     // init value for screen refresh timer
   double intrTime; // variable for interrupt timing
 } SPCSystem;
-
-#define CAS_STOP 0
-#define CAS_PLAY 1
-#define CAS_REC 2
-
-#endif /* SPC1000_H */

@@ -134,6 +134,11 @@ TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
 	{ 0, -1, 0, "LAST KEY" }
 };
 
+uint32 cas_start_time() {
+  return (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
+}
+
+
 /*************************************************************/
 /** INI file processing                                     **/
 /*************************************************************/
@@ -266,30 +271,6 @@ void ReadINI(char *ini_data, int ini_len) {
 /*************************************************************/
 
 /**
- * Reset Cassette structure
- * @param cas cassette structure
- */
-void ResetCassette(Cassette *cas) {
-  cas->rdVal = -2;
-  cas->cnt0 = cas->cnt1 = 0;
-
-  cas->wrVal = 0; // correct location?
-  cas->wrRisingT = 0;
-}
-
-/**
- * Initialize cassette structure
- * @param cas cassette structure
- */
-void InitCassette(Cassette *cas) {
-  cas->button = CAS_STOP;
-
-  cas->wfp = NULL;
-  cas->rfp = NULL;
-  ResetCassette(cas);
-}
-
-/**
  * Initialize cassette structure
  * @param cas cassette structure
  */
@@ -390,96 +371,6 @@ void spc_load_snapshot(byte *filename) {
 }
 
 /*************************************************************/
-/** Cassette Tape Processing                                **/
-/*************************************************************/
-int ReadVal(void) {
-  int c = -1;
-
-  if (dos_hasdata(&dosbuf_)) {
-    return dos_read(&dosbuf_);
-  } else  if (spc.IO.cas.rfp != NULL) {
-    static int EOF_flag = 0;
-
-    c = fgetc(spc.IO.cas.rfp);
-    if (c == EOF) {
-      if (!EOF_flag) {
-        printf("EOF\n");
-        EOF_flag = 1;
-      }
-      c = -1;
-    } else {
-      EOF_flag = 0;
-      c -= '0';
-    }
-  }
-  return c;
-}
-
-int CasRead(Cassette *cas) {
-  Uint32 curTime;
-  int bitTime;
-
-  curTime =
-      (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5) - spc.IO.cas.startTime;
-  bitTime = (cas->rdVal == 0) ? 56 : (cas->rdVal == 1) ? 112 : 0;
-
-  while (curTime >= (cas->cnt0 * 56 + cas->cnt1 * 112 + bitTime)) {
-    if (cas->rdVal == 0)
-      cas->cnt0++;
-    if (cas->rdVal == 1)
-      cas->cnt1++;
-
-    cas->rdVal = ReadVal();
-
-    if (cas->rdVal == -1)
-      break;
-
-    bitTime = (cas->rdVal == 0) ? 56 : (cas->rdVal == 1) ? 112 : 0;
-  }
-
-  curTime -= (cas->cnt0 * 56 + cas->cnt1 * 112);
-
-  switch (cas->rdVal) {
-  case 0:
-    if (curTime < 28)
-      return 1; // high
-    else
-      return 0; // low
-
-  case 1:
-    if (curTime < 56)
-      return 1; // high
-    else
-      return 0; // low
-  }
-  return 0; // low for other cases
-}
-
-void CasWrite(Cassette *cas, int val) {
-  Uint32 curTime;
-
-  curTime = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-  if (!cas->wrVal & val) // rising edge
-    cas->wrRisingT = curTime;
-  if (cas->wrVal & !val) { // falling edge
-    byte b = (curTime - cas->wrRisingT) < 32 ? '0' : '1';
-    if (spc.IO.cas.wfp != NULL) {
-      fputc(b, cas->wfp);
-    } else if (spc.IO.cas.dos) {
-      dos_putc(&dosbuf_, b);
-    }
-  }
-
-  cas->wrVal = val;
-}
-
-uint32 spc_cas_start_time() {
-  return (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-}
-
-extern int noname_load_;
-
-/*************************************************************/
 /** Output I/O Processing                                   **/
 /*************************************************************/
 /**
@@ -525,7 +416,7 @@ void OutZ80(register word Port, register byte Value) {
           } else {
             spc.IO.cas.motor = 1;
             printf("Motor On\n");
-            spc.IO.cas.startTime = spc_cas_start_time();
+            spc.IO.cas.startTime = cas_start_time();
             ResetCassette(&spc.IO.cas);
           }
         }
