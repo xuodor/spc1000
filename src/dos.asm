@@ -246,16 +246,13 @@ DOSDEL:
     LD A,FGDEL
     LD (DOSCMF),A
     CALL CWOPEN                 ; Use CWOPEN to run DEL
-
+    LD H,B
+    LD L,C
+    LD A,FGSAVE
+    LD (DOSCMF),A
     LD A,(FILNAM)
     OR A
     JP Z,SERROR
-
-    LD H,B
-    LD L,C
-
-    LD A,FGSAVE
-    LD (DOSCMF),A
     RET
 
     ;; Stop button at the end of SAVE
