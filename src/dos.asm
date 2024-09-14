@@ -234,8 +234,6 @@ DOSCMF:
     CALL BUFCLR
     RET
 
-DOSSAV1:
-    JP C,CBREAK
 DOSEND:
     XOR A
     JP DOSREQ
@@ -255,10 +253,12 @@ DOSDEL:
     JP Z,SERROR
     RET
 
-    ;; Stop button at the end of SAVE
-    seek CBRSHM1
-    org CBRSHM1
-    CALL DOSSAV1
+    ;; Stop button after SAVE
+    seek 3B0EH
+    org 3B0EH
+CBRSHM:
+    POP HL
+    CALL DOSEND
 
 ;;; Rename LET to DIR
     seek 679BH
