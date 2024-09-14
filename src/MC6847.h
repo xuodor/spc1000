@@ -24,7 +24,6 @@ void CloseMC6847(void);
 void SDLWaitQuit(void);
 void ScaleWindow(int scale);
 
-int64_t get_timestamp_ms();
 int can_display_char();
 
 #endif // __MC6847_H__

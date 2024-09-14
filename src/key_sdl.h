@@ -1,6 +1,5 @@
 // SPC-1000 key mapping for SDL
-#ifndef SPCKEY_H_
-#define SPCKEY_H_
+#pragma once
 
 #include "SDL_keycode.h"
 #include "SDL_version.h"
@@ -17,4 +16,9 @@ typedef struct
 	char *keyName; // for debugging
 } TKeyMap;
 
-#endif
+#define KeyCode SDLKey
+
+#define VK_RETURN SDLK_RETURN
+#define VK_ESCAPE SDLK_ESCAPE
+#define VK_UP     SDLK_UP
+#define VK_DOWN   SDLK_DOWN

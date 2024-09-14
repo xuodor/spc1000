@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "sysdep.h"
 #include "MC6847.h"
 
 #define MAXFL 8
@@ -22,7 +23,7 @@ int osd_dlg_cnt_;
 int osd_dlg_sel_;
 int osd_dlg_top_;
 int osd_dlg_max_ = 8; /* max visible lines */
-byte osd_dlg_sel_str_[256];
+byte *osd_dlg_sel_str_;
 osd_dlg_callback osd_dlg_cb_;
 
 /*
@@ -30,7 +31,8 @@ osd_dlg_callback osd_dlg_cb_;
  */
 
 void osd_init() {
-  osd_ = (byte *)malloc(0x2000);
+  osd_ = (byte *)malloc(32*16);
+  osd_dlg_sel_str_ = (byte *)malloc(256);
   osd_toast_begin_ms_ = -1;
   osd_visible_ = 0;
   osd_dialog_ = 0;
@@ -143,9 +145,9 @@ void osd_toast(byte *str, int vloc, int inverse) {
   osd_toast_begin_ms_ = get_timestamp_ms();
 }
 
-
 void osd_exit() {
   free(osd_);
+  free(osd_dlg_sel_str_);
 }
 
 byte *_osd_dlg_fstr(int ind) {
@@ -222,23 +224,23 @@ void osd_close_dialog() {
   free(osd_dlg_fnames_);
 }
 
-void osd_process_key(SDLKey key) {
-  if (key == SDLK_ESCAPE || key == SDLK_RETURN) {
-    if (key == SDLK_RETURN) {
+void osd_process_key(KeyCode key) {
+  if (key == VK_ESCAPE || key == VK_RETURN) {
+    if (key == VK_RETURN) {
       strcpy(osd_dlg_sel_str_, globbuf_.gl_pathv[osd_dlg_sel_]);
     }
     osd_close_dialog();
 
     osd_dlg_cb_(osd_dlg_sel_str_);
 
-  } else if (key == SDLK_UP) {
+  } else if (key == VK_UP) {
     if (osd_dlg_sel_ == 0) return;
     --osd_dlg_sel_;
     if (osd_dlg_sel_ < osd_dlg_top_) {
       osd_dlg_top_ = MAX(osd_dlg_top_-osd_dlg_max_/2, 0);
     }
     _osd_dlg_update();
-  } else if (key == SDLK_DOWN) {
+  } else if (key == VK_DOWN) {
     if (osd_dlg_sel_ == osd_dlg_cnt_-1) return;
     ++osd_dlg_sel_;
     if (osd_dlg_sel_ > osd_dlg_top_ + osd_dlg_max_-1) {

@@ -2,7 +2,7 @@
 #define OSD_H_
 
 #include "common.h"
-#include "spckey.h"
+#include "key.h"
 
 typedef void (*osd_dlg_callback)(byte *sel_str);
 
@@ -19,6 +19,6 @@ void osd_print(int x, int y, byte *str, int inverse);
 void osd_toast(byte *msg, int vloc, int inverse);
 void osd_open_dialog(byte *title, byte *globp, osd_dlg_callback cb);
 void osd_close_dialog();
-void osd_process_key(SDLKey key);
+void osd_process_key(KeyCode key);
 
 #endif

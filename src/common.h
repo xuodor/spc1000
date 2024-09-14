@@ -7,6 +7,10 @@
 
 #pragma once
 
+#define USE_SDL
+
+#include <stdint.h>
+
 typedef struct
 {
 	int colorMode;
@@ -47,4 +51,4 @@ int null_printf(const char *format, ...);
 #define DLOG null_printf
 #endif
 
-extern uint32 cas_start_time();
+extern uint32_t cas_start_time();

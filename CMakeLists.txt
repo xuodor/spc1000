@@ -11,6 +11,7 @@ set(SOURCE_FILES \\
     src/cassette.c \\
     src/dos.c \\
     src/osd.c \\
+    src/sysdep.c \\
     src/rom.c)
 find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})

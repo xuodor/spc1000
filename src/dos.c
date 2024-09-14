@@ -4,7 +4,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "Z80.h"
 #include "dos.h"
 #include "osd.h"
 #include "cassette.h"
@@ -18,6 +17,7 @@ typedef struct {
   DosBuf *dos_buf;
 } LoadData;
 
+DosBuf *dosbuf_;
 LoadData load_params_;
 
 byte _9bits_to_byte(byte* buf) {
@@ -66,8 +66,8 @@ byte dos_get_command(DosBuf *db) {
   return dos_hasdata(db) ? _9bits_to_byte(db->buf+OFFSET_PREAMBLE) : 0;
 }
 
-word read_checksum(byte* buf, int nbytes) {
-  word res = 0;
+uint16_t read_checksum(byte* buf, int nbytes) {
+  uint16_t res = 0;
   for (int i = 0; i < nbytes; ++i) {
     buf++;  /* skip the first bit - always '1' */
     for (int k = 0; k < 8; ++k)
@@ -76,8 +76,8 @@ word read_checksum(byte* buf, int nbytes) {
   return res;
 }
 
-word calc_checksum(byte* buf, int nbytes) {
-  word res = 0;
+uint16_t calc_checksum(byte* buf, int nbytes) {
+  uint16_t res = 0;
   for (int i = 0; i < nbytes; ++i) {
     for (int k = 0; k < 8; ++k)
       if ((buf[i] >> k) & 0x1) ++res;
@@ -146,7 +146,7 @@ void dos_build_list_resp(DosBuf *db) {
   byte *outp = body;
   glob_t globbuf;
   size_t maxbody = 0x100; /* ff00h - ffffh */
-  word body_len;
+  uint16_t body_len;
   int nfiles = 0;
 
   memset(body, 0, 0x100 + 2);
@@ -174,7 +174,7 @@ void dos_build_list_resp(DosBuf *db) {
   }
 
   body_len = outp - body + 1; /* extra zero at the end */
-  word bcs = calc_checksum(body, body_len);
+  uint16_t bcs = calc_checksum(body, body_len);
   body[body_len  ] = bcs / 256; /* maybe swap? */
   body[body_len+1] = bcs % 256;
 
@@ -186,7 +186,7 @@ void dos_build_list_resp(DosBuf *db) {
   fcb[21] = 0xff;
   fcb[22] = 0xb0;  /* exec point (MTEXEC) */
   fcb[23] = 0x13;
-  word fcs = calc_checksum(fcb, 0x80);
+  uint16_t fcs = calc_checksum(fcb, 0x80);
   fcb[0x80] = fcs / 256; /* maybe swap? */
   fcb[0x81] = fcs % 256;
 
@@ -203,11 +203,11 @@ void dos_build_load_resp(DosBuf *db, byte *msg, byte *data, size_t body_len) {
   strncpy(fcb+1, msg, 16);
   fcb[18] = body_len % 256; /* length (MTBYTE) */
   fcb[19] = body_len / 256;
-  word fcs = calc_checksum(fcb, 0x80);
+  uint16_t fcs = calc_checksum(fcb, 0x80);
   fcb[0x80] = fcs / 256; /* maybe swap? */
   fcb[0x81] = fcs % 256;
 
-  word bcs = calc_checksum(body, body_len);
+  uint16_t bcs = calc_checksum(body, body_len);
   body[body_len  ] = bcs / 256; /* maybe swap? */
   body[body_len+1] = bcs % 256;
 
@@ -232,8 +232,6 @@ int dos_max_reached() {
   return result == 0 && globbuf.gl_pathc >= 31;
 }
 
-#define FCLOSE(fp) { fclose(fp); fp = 0; }
-
 void dos_load(byte *filename) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
@@ -243,8 +241,6 @@ void dos_load(byte *filename) {
     /* File not found. Notify user with an error. */
     if (!cas->rfp) {
       dos_build_load_resp(load_params_.dos_buf, "FILE NOT FOUND", "\0\0", 2);
-    } else {
-      printf("open [%s]:%p\n", filename, cas->rfp);
     }
   } else {
     DLOG("load canceled");
@@ -254,8 +250,6 @@ void dos_load(byte *filename) {
   cas->startTime = cas_start_time();
   ResetCassette(cas);
 }
-
-int noname_load_ = 0;
 
 /**
  * Executes the received dos command.
@@ -279,27 +273,22 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     dos_reset(db);
     load_params_.cas = cas;
     load_params_.dos_buf = db;
-    printf("filename:[%s] rfp:%p\n", filename, cas->rfp);
     if (filename[0] == '\0') {
       if (!cas->rfp) {
         if (!osd_dialog_on()) {
           osd_open_dialog("LOAD", "*.TAP", dos_load);
         }
       } else {
-        printf("eof: %d\n", feof(cas->rfp));
         if (feof(cas->rfp)) {
           dos_build_load_resp(load_params_.dos_buf, "READ ERROR", "\0\0", 2);
           // TODO: After this, force the stop button to not repeat this message
           // upon subsequent LOAD command.
         }
         cas->button = CAS_PLAY;
-        noname_load_ = 1;
       }
     } else {
-      printf("loading\n");
       if (cas->rfp) FCLOSE(cas->rfp);
       dos_load(filename);
-      noname_load_ = 0;
     }
     break;
   case DOSCMD_SAVE:
@@ -349,12 +338,12 @@ void dos_dump(byte *p, size_t dl) {
   if (dl % 8) puts(s);
 }
 
-word info_dosv_fcb(byte* fcb) {
+uint16_t info_dosv_fcb(byte* fcb) {
   byte fcb_name[17+1];
-  word len;
-  word start;
-  word exec;
-  word checksum;
+  uint16_t len;
+  uint16_t start;
+  uint16_t exec;
+  uint16_t checksum;
   byte res[0x80+2+1];
 
   byte *p = fcb + OFFSET_PREAMBLE;
@@ -381,8 +370,8 @@ word info_dosv_fcb(byte* fcb) {
   return len;
 }
 
-void info_file_body(byte* buf, word len) {
-  word checksum;
+void info_file_body(byte* buf, uint16_t len) {
+  uint16_t checksum;
   byte *res;
 
   res = (byte *)malloc(len+2);
@@ -401,7 +390,7 @@ void info_file_body(byte* buf, word len) {
 void test_read_file_body() {
   byte fcb[FIB_TAP_SIZE];
   byte buf[256*9+1];
-  word bl;
+  uint16_t bl;
 
   FILE *fp = fopen("load.tap", "rb");
   fread(fcb, 1, FIB_TAP_SIZE, fp);

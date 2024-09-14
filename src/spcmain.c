@@ -32,20 +32,18 @@
 #define INTR_PERIOD 16.6666
 
 #define SPC_EMUL_VERSION "1.1 (2024.07.14)"
-#define FCLOSE(x) fclose(x), (x) = NULL
 
 SPCConfig spcConfig;
 
 SPCSystem spc;
 
-DosBuf dosbuf_;
 byte *cgbuf_;
 
 /**
  * SPC simulation structure, realted to the timing
  */
 typedef struct {
-  Uint32 baseTick, curTick, prevTick;
+  uint32_t baseTick, curTick, prevTick;
 } SPCSimul;
 
 SPCSimul simul;
@@ -134,7 +132,7 @@ TKeyMap spcKeyMap[] = // the last item's keyMatIdx must be -1
 	{ 0, -1, 0, "LAST KEY" }
 };
 
-uint32 cas_start_time() {
+uint32_t cas_start_time() {
   return (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
 }
 
@@ -289,6 +287,8 @@ void InitIOSpace(void) {
   spc.turbo = 0;
   for (i = 0; i < 10; i++) // turn off all keys
     spc.IO.keyMatrix[i] = 0xff;
+
+  dosbuf_ = (DosBuf *)malloc(sizeof(DosBuf));
 }
 
 /*************************************************************/
@@ -396,60 +396,9 @@ void OutZ80(register word Port, register byte Value) {
     }
     spc.IO.GMODE = Value;
     DLOG("GMode:%02X\n", Value);
-  } else if ((Port & 0xE000) == 0x6000) // SMODE
-  {
-    if (spc.IO.cas.button != CAS_STOP) {
-      if (Value & 0x02) { // Motor
-        if (spc.IO.cas.pulse == 0) {
-          spc.IO.cas.pulse = 1;
-        }
-      } else {
-        if (spc.IO.cas.pulse) {
-          spc.IO.cas.pulse = 0;
-          if (spc.IO.cas.motor) {
-            spc.IO.cas.motor = 0;
-            printf("Motor Off dos:%d\n", spc.IO.cas.dos);
-            if (spc.IO.cas.dos) {
-              //if (spc.IO.cas.rfp) FCLOSE(spc.IO.cas.rfp);
-              if (spc.IO.cas.wfp) FCLOSE(spc.IO.cas.wfp);
-            }
-          } else {
-            spc.IO.cas.motor = 1;
-            printf("Motor On\n");
-            spc.IO.cas.startTime = cas_start_time();
-            ResetCassette(&spc.IO.cas);
-          }
-        }
-      }
-    } // != CAS_STOP
-
-    if (spc.IO.cas.button == CAS_REC && spc.IO.cas.motor)
-      CasWrite(&spc.IO.cas, Value & 0x01);
-
-    if (Value & 0x10) {  // DOS signal
-      if (!spc.IO.cas.dos) {
-        printf("doson\n");
-        spc.IO.cas.dos = 1;
-        spc.IO.cas.button = CAS_REC;
-        dos_reset(&dosbuf_);
-        if (spc.IO.cas.wfp) {
-          FCLOSE(spc.IO.cas.wfp);
-        }
-      }
-    } else if (spc.IO.cas.dos) {
-      printf("dosoff\n");
-      spc.IO.cas.dos = 0;
-      if (spc.IO.cas.wfp) {
-        FCLOSE(spc.IO.cas.wfp);
-      }
-      Uint32 start_time = (spc.tick * 125) + ((4000 - spc.Z80R.ICount) >> 5);
-      if (dos_exec(&dosbuf_, &spc.IO.cas, start_time)) {
-        ResetCassette(&spc.IO.cas);
-      }
-    }
-  } else if ((Port & 0xFFFE) == 0x4000) // PSG
-  {
-
+  } else if ((Port & 0xE000) == 0x6000) {
+    CasIOWrite(&spc.IO.cas, Value);
+  } else if ((Port & 0xFFFE) == 0x4000) {
     if (Port & 0x01) // Data
     {
       Write8910(&spc.IO.ay8910, (byte)spc.IO.psgRegNum, Value);
@@ -693,20 +642,7 @@ byte InZ80(register word Port) {
     // Data
     if (Port & 0x01) {
       if (spc.IO.psgRegNum == 14) {
-        byte retval = 0x1f;
-        // 0x80 - cassette data input
-        // 0x40 - motor status
-        if (spc.IO.cas.button == CAS_PLAY && spc.IO.cas.motor) {
-          if (CasRead(&spc.IO.cas) == 1)
-            retval |= 0x80; // high
-          else
-            retval &= 0x7f; // low
-        }
-        if (spc.IO.cas.motor)
-          return (retval & (~(0x40))); // 0 indicates Motor On
-        else
-          return (retval | 0x40);
-
+        return CasIORead(&spc.IO.cas);
       } else
         return RdData8910(&spc.IO.ay8910);
     }
@@ -904,5 +840,7 @@ int main(int argc, char *argv[]) {
     ExecZ80(R); // Z-80 emulation
   }
   CloseMC6847();
+  free(dosbuf_);
+  osd_exit();
   return 0;
 }

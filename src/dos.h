@@ -1,5 +1,4 @@
-#ifndef DOS_H_
-#define DOS_H_
+#pragma once
 
 #include "common.h"
 #include "cassette.h"
@@ -14,8 +13,6 @@
 #define MAX_FILES 15
 #define FIB_TAP_SIZE 24679
 #define MAX_BODY_TAP (0x2af8+0x14+0x14+(1+256+2)*9+1)
-#define FNF_TAP "fnf.bin"
-#define CANCEL_TAP "cancel.bin"
 
 typedef unsigned long uint32;
 
@@ -25,6 +22,10 @@ typedef struct {
   int p;
 } DosBuf;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time);
 void dos_putc(DosBuf *db, byte b);
 void dos_put_byte(DosBuf *db, byte b);
@@ -32,4 +33,9 @@ void dos_rewind(DosBuf *db);
 void dos_reset(DosBuf *db);
 int dos_hasdata(DosBuf *db);
 int dos_read(DosBuf* db);
+
+extern DosBuf *dosbuf_;
+
+#ifdef __cplusplus
+}
 #endif

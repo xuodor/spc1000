@@ -4,15 +4,11 @@
  * @author Kue-Hwan Sihn (ionique)
  * @date 2005~2006.12
  */
-#include <time.h>
-
 #include "MC6847.h"
 #include "common.h"
 #include "osd.h"
 
 #include "SDL.h"
-
-int64_t get_timestamp_ms();
 
 typedef unsigned char byte;
 
@@ -694,18 +690,6 @@ void SDLWaitQuit(void) {
     }
   }
   SDL_Quit();
-}
-
-int64_t get_timestamp_ms() {
- struct timespec tms;
-
-  /* POSIX.1-2008 way */
-  if (clock_gettime(CLOCK_REALTIME, &tms))
-      return -1;
-
-  int64_t millis = tms.tv_sec * 1000;
-  millis += tms.tv_nsec/1000000;
-  return millis;
 }
 
 int can_display_char() {
