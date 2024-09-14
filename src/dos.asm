@@ -27,7 +27,6 @@ LOADST2:    EQU 389DH
 LDFNTR2:    EQU 3892H
 LOAD:       EQU 392CH
 SMODE:      EQU 6000H
-CWOPEN:     EQU 3A5DH
 NULFNM:     EQU 3A98H
 STREXX:     EQU 459DH
 BCFTCH:     EQU 25C4H
@@ -58,12 +57,12 @@ FILEBUF:    EQU 1397H
     org 2F98H
     DEFW DIR
 
-;;; Define DEL command entry
+;;; Define DEL entry point
     seek 2FCEH
     org 2FCEH
     DEFW DOSDEL
 
-;;; Adjust ROPEN entry point
+;;; Update ROPEN entry point
     seek 3000H
     org 3000H
     DEFW ROPEN
@@ -129,7 +128,7 @@ DOSDEL:
     XOR A
     LD (FILEFG),A
     LD A,FGDEL
-    LD (DOSCMB),A
+    LD (DOSCMF),A
     CALL CWOPEN
 
     ;; Restore text pointer
@@ -137,11 +136,11 @@ DOSDEL:
     LD L,C
 
     LD A,FGSAVE
-    LD (DOSCMB),A
+    LD (DOSCMF),A
     RET
 
 ;;; Lets assembly programs run automatically after loading.
-;;; Setting MTEXEC in FIB to the right start address.
+;;; Setting MTEXEC in FIB to the exec addr does the trick.
 MLEXEC:
     LD HL,(MTEXEC)
     LD A,H
@@ -151,6 +150,8 @@ MLEXEC:
     PUSH DE
     JP (HL)
 
+;;; Read program name from command param and set to FIB.
+;;; Used by LOAD/SAVE <PROGRAM>
 SETFN:
     CALL BCFTCH
     DEC BC
@@ -185,8 +186,7 @@ ROPEN:
     LD H,B
     RET
 
-;;; Disable LOAD? command to repurpose the code space
-;;; for VERIFY: to DOSDEL
+;;; Disable LOAD? command to repurpose the VERIFY code space
     seek 3939H
     org 3939H
     NOP
@@ -197,14 +197,20 @@ ROPEN:
     JR C,TPRDER
     JP MLEXEC
 
-;;; CWOPEN
-    ;; Use SETFN to save space for DEL/autorun
-    seek 3A6BH
-    org 3A6BH
+;;; CWOPEN updated to use SETFN
+    seek 3A5DH
+    org 3A5DH
+CWOPEN:
+    LD A,(FILEFG)
+    OR A
+    JP NZ,FILEER
+    LD A,2
+    LD (FILEFG),A
+    LD C,L
+    LD B,H
     call SETFN
-
     DEFB 3Eh                    ; LD A,
-DOSCMB:
+DOSCMF:
     DEFB FGSAVE
     CALL DOSREQ
 
@@ -249,12 +255,6 @@ DIR:
     org CBRSHM1
     CALL DOSSAV1
 
-;;; Update the reference to UDLMES
-
-    seek 3F6BH
-    org 3f6BH
-    LD DE,UDLMES2
-
 ;;; Rename LET to DIR
     seek 679BH
     org 679BH
@@ -265,74 +265,3 @@ DIR:
     org 680CH
     DEFB 44H, 45H, 0CCH         ; DEL
     DEFB 45H, 52H, 0D2H         ; ERR
-
-;;; Shortens the error message to give more code space to
-;;; new commands.
-
-    seek ERRTXT
-    org ERRTXT
-
-    DEFB 00H                    ;1
-    DEFM "E:NEXT"
-    DEFB 00H                    ;2
-    DEFM "E:SYNTAX"
-    DEFB 00H                    ;3
-    DEFM "E:RETURN"
-    DEFB 00H                    ;4
-    DEFM "E:NO DATA"
-    DEFB 00H                    ;5
-    DEFM "E:BAD FNCALL"
-    DEFB 00H                    ;6
-    DEFM "E:OVERFLOW"
-    DEFB 00H                    ;7
-    DEFM "E:OOM"
-    DEFB 00H
-UDLMES2:                        ;8
-    DEFM "E:UNDEF LN#"
-    DEFB 00H                    ;9
-    DEFB "E:INDEX"
-    DEFB 00H                    ;10
-    DEFB "E:DUPDEF"
-    DEFB 00H                    ;11
-    DEFM "E:DIV/0"
-    DEFB 00H                    ;12
-    DEFM "E:BAD DIRECT"
-    DEFB 00H                    ;13
-    DEFM "E:TYPE MISMATCH"
-    DEFB 00H                    ;14
-    DEFM "HB"
-    DEFB 00H                    ;15
-    DEFM "E:STR 2LONG"
-    DEFB 00H                    ;16
-    DEFM "E:CMPL EXPR"
-    DEFB 00H                    ;17
-    DEFM "E:NO CONTINUE"
-    DEFB 00H                    ;18
-    DEFM "E:BAD USRFN"
-    DEFB 00H                    ;19
-    DEFM "E:NO RESUME"
-    DEFB 00H                    ;20
-    DEFM "E:RESUME"
-    DEFB 00H                    ;21
-    DEFM "E:FORMAT"
-    DEFB 00H                    ;22
-    DEFM "E:MISSING OP"
-    DEFB 00H                    ;23
-    DEFM "E:REPEAT"
-    DEFB 00H                    ;24
-    DEFM "E:UNTIL"
-    DEFB 00H                    ;25
-    DEFM "E:WHILE"
-    DEFB 00H                    ;26
-    DEFM "E:WEND"
-    DEFB 00H                    ;27
-    DEFM "E:TAPE READ"
-    DEFB 00H                    ;28
-    DEFM "E:UNDEF DEV"
-    DEFB 00H                    ;29
-    DEFM "E:STMT N/A"
-    DEFB 00H                    ;30
-    DEFM "E:EMPTY STACK"
-    DEFB 00H                    ;31
-    DEFM "E:FILE"
-    DEFB 00H
