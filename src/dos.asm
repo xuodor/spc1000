@@ -40,15 +40,11 @@ LDINGM:     EQU 3A49H
 VSTART:     EQU 7A3BH
 TEXTST:     EQU 7C9DH
 
-;;; DOS
+;;; DOS command types
 FGSAVE:     EQU 0D3H
 FGLOAD:     EQU 0D4H
 FGDIR:      EQU 0D5H
 FGDEL:      EQU 0D6H
-
-;;; DOSV RESPONSE
-FILECNT:    EQU 1396H
-FILEBUF:    EQU 1397H
 
     incbin 'src/spcall.rom'
 
@@ -83,7 +79,7 @@ CROPEN:
     CALL FLOAD
     JP C,BREAK
     CALL CR2
-LFNOK:
+
     PUSH BC
     CALL BUFCLR
     LD DE,LDINGM
@@ -124,33 +120,21 @@ DOSREQ1:
     POP BC
     RET
 
-DOSDEL:
-    XOR A
-    LD (FILEFG),A
-    LD A,FGDEL
-    LD (DOSCMF),A
-    CALL CWOPEN
+    ;; Directory list
+DIR:
+    INC HL
+    PUSH HL
+    LD A,FGDIR
+    CALL DOSREQ
 
-    ;; Restore text pointer
-    LD H,B
-    LD L,C
-
-    LD A,FGSAVE
-    LD (DOSCMF),A
+    CALL FLOAD
+    CALL MLOAD
+    CALL MLEXEC
+    CALL DOSEND
+    POP HL
     RET
 
-;;; Lets assembly programs run automatically after loading.
-;;; Setting MTEXEC in FIB to the exec addr does the trick.
-MLEXEC:
-    LD HL,(MTEXEC)
-    LD A,H
-    OR L
-    JP Z,RTBLOD
-    LD DE,RTBLOD
-    PUSH DE
-    JP (HL)
-
-;;; Read program name from command param and set to FIB.
+;;; Read program name from the command param and set to FIB.
 ;;; Used by LOAD/SAVE <PROGRAM>
 SETFN:
     CALL BCFTCH
@@ -161,11 +145,11 @@ SETFN:
     CP 03AH
     JR Z,NULFN
     CALL STREXX
-
     DEC BC
+    OR A
+    RET Z
     PUSH BC
     CP 17
-EMPTST:
     JP NC,IFCALL
     LD B,0
     LD C,A
@@ -178,10 +162,22 @@ NULFN:
     LD (DE),A
     RET
 
+;;; Lets assembly programs run automatically after loading.
+;;; Setting MTEXEC in FIB to the exec addr does the trick.
+MLEXEC:
+    LD HL,(MTEXEC)
+    LD A,H
+    OR L
+    JR Z,ROPND
+    LD DE,ROPND
+    PUSH DE
+    JP (HL)
+
 ROPEN:
     LD C,L
     LD B,H
     CALL CROPEN
+ROPND:
     LD L,C
     LD H,B
     RET
@@ -236,20 +232,22 @@ DOSEND:
     XOR A
     JP DOSREQ
 
-    ;; Directory list
-DIR:
-    INC HL
-    PUSH HL
-    LD A,FGDIR
-    CALL DOSREQ
+DOSDEL:
+    XOR A
+    LD (FILEFG),A
+    LD A,FGDEL
+    LD (DOSCMF),A
+    CALL CWOPEN                 ; Use CWOPEN to fill out FIB
 
-    CALL FLOAD
-    JP C,BREAK
-    CALL MLOAD
-    JP C,BREAK
-    CALL MLEXEC
-    CALL DOSEND
-    POP HL
+    LD A,(FILNAM)
+    OR A
+    JP Z,SERROR
+
+    LD H,B
+    LD L,C
+
+    LD A,FGSAVE
+    LD (DOSCMF),A
     RET
 
     ;; Stop button at the end of SAVE
