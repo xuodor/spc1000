@@ -9,32 +9,50 @@ TABPRT: EQU 0802h
 FILNAM: EQU 1397h
 MTADRS: EQU 13AAh
 DEPRT:  EQU 07F3h
+SPPRT:  EQU 0862H
 
-    ORG 13B0h
+    ORG 13AEh
+    NOP
+    NOP
+    ;; # of files
+    LD A,(FILNAM)
+    OR A
+    RET Z
 
+    ;; file list
     LD HL,(MTADRS)
-DOSPRT:
+    PUSH BC
+FNAME:
+    LD B,8
+FNCHAR:
     LD A,(HL)
     INC HL
     OR A
-    JR Z,DOSPNX
+    JR Z,SPCCH
     CALL ACCPRT
-    JR DOSPRT
+    DEC B
+    JR FNCHAR
 
-DOSPNX:
-    CALL TABPRT
+SPCCH:
+    CALL SPPRT
+    DJNZ SPCCH
+
+    ;; Additional zero indicates the end of the list
     LD A,(HL)
     OR A
-    JR NZ,DOSPRT
-    ;; The number of files
+    JR NZ,FNAME
+
+MOREFL:
+    ;; More files?
     LD A,(FILNAM)
     CP 0FFh
-    JR NZ,DOSPRTE
-    LD DE,DOSPMG
+    JR NZ,DIREND
+    LD DE,MOREMSG
     CALL DEPRT
-
-DOSPRTE:
+DIREND:
+    POP BC
     RET
-DOSPMG:
-    DEFB 28h, 22h, 22h, 22h, 29h ; (...)
+
+MOREMSG:
+    DEFM '(...)'
     DEFB 0

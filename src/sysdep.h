@@ -6,6 +6,8 @@
 extern "C" {
 #endif
 
+#define DIR_PATH "/disk"
+
 uint32_t get_timestamp_ms();
 
 #ifdef __cplusplus

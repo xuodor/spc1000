@@ -19,6 +19,9 @@ for b in f.read():
     row = []
     rc = 0
 
+if row:
+    rows.append(', '.join(row))
+
 for r in rows[:-2]:
   print('  ' + r + ',')
 print('  ' + rows[-1])
