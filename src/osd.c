@@ -10,8 +10,6 @@
 
 #define MAXFL 8
 
-extern int screenMode;
-
 int osd_visible_;
 int64_t osd_toast_begin_ms_;
 byte *osd_;
@@ -59,30 +57,15 @@ byte *osd_font_data(byte ascii, byte attr) {
 }
 
 void osd_print(int x, int y, byte *str, int inverse) {
-  if (screenMode == 0) {
-      int offset = currentPage * 0x200 + y * 32 + x;
+  int offset = currentPage * 0x200 + y * 32 + x;
 
-      byte *dst = osd_ + offset;
-      while (*str) {
-        *dst = *str;
-        if (inverse) dst[0x800] |= 0x01;
-        else dst[0x800] &= ~0x01;
-        str++;
-        dst++;
-      }
-  } else {
-    /* screenMode == 5 Hi-res mode */
-    int bp = x + y*32*12;
-    while (*str) {
-      byte *chp = osd_font_data(*str, 0);
-      for (int i = 0; i < 32*12; i += 32) {
-        byte c = *chp++;
-        if (inverse) c = 255-c;
-        osd_[bp+i] = c;
-      }
-      bp++;
-      str++;
-    }
+  byte *dst = osd_ + offset;
+  while (*str) {
+    *dst = *str;
+    if (inverse) dst[0x800] |= 0x01;
+    else dst[0x800] &= ~0x01;
+    str++;
+    dst++;
   }
 }
 
