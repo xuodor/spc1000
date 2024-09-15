@@ -233,18 +233,17 @@ int dos_max_reached() {
   return result == 0 && globbuf.gl_pathc >= 31;
 }
 
-void dos_load(char *filename) {
+void dos_load(char *filename, char *errmsg) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
-  if (filename[0] != '\0') {
+  if (filename) {
     cas->rfp = fopen(filename, "rb");
-
-    /* File not found. Notify user with an error. */
+    /* File open error. Notify user with an error. */
     if (!cas->rfp) {
-      dos_build_load_resp(load_params_.dos_buf, "FILE NOT FOUND", "\0\0", 2);
+      dos_build_load_resp(load_params_.dos_buf, "FILE ERROR", "\0\0", 2);
     }
   } else {
-    dos_build_load_resp(load_params_.dos_buf, "CANCELED", "\0\0", 2);
+    dos_build_load_resp(load_params_.dos_buf, errmsg, "\0\0", 2);
   }
   cas->button = CAS_PLAY;
   cas->startTime = cas_start_time();
@@ -288,7 +287,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
       }
     } else {
       if (cas->rfp) FCLOSE(cas->rfp);
-      dos_load(filename);
+      dos_load(filename, NULL);
     }
     break;
   case DOSCMD_SAVE:
@@ -299,7 +298,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     }
     if (dos_max_reached()) {
       /* Just a warning. */
-      osd_toast("MAX FILES REACHED", 0, 0);
+      /* osd_toast("MAX FILES REACHED", 0, 0); */
     }
     dos_reset(db);
     if ((cas->wfp = fopen(filename, "wb")) == NULL) {

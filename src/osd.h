@@ -4,7 +4,7 @@
 #include "common.h"
 #include "key.h"
 
-typedef void (*osd_dlg_callback)(char *sel_str);
+typedef void (*osd_dlg_callback)(char *sel, char *errmsg);
 
 extern byte *osd_;
 extern int osd_visible_;

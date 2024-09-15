@@ -161,8 +161,7 @@ void osd_open_dialog(char *title, char *globp, osd_dlg_callback cb) {
   glob(globp, 0, 0, &globbuf_);
   int nfiles = globbuf_.gl_pathc;
   if (nfiles == 0) {
-    osd_toast("NO FILES FOUND", 0, 0);
-    cb("");
+    cb(NULL, "NO FILES");
     return;
   }
   osd_dlg_cb_ = cb;
@@ -211,10 +210,12 @@ void osd_process_key(KeyCode key) {
   if (key == VK_ESCAPE || key == VK_RETURN) {
     if (key == VK_RETURN) {
       strcpy(osd_dlg_sel_str_, globbuf_.gl_pathv[osd_dlg_sel_]);
+    } else {
+      *osd_dlg_sel_str_ = '\0';
     }
     osd_close_dialog();
 
-    osd_dlg_cb_(osd_dlg_sel_str_);
+    osd_dlg_cb_(osd_dlg_sel_str_, NULL);
 
   } else if (key == VK_UP) {
     if (osd_dlg_sel_ == 0) return;

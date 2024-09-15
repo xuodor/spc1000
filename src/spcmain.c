@@ -348,8 +348,8 @@ int spc_save_snapshot(char *notused) {
   return -3;
 }
 
-void spc_load_snapshot(char *filename) {
-  if (filename[0] != '\0') {
+void spc_load_snapshot(char *filename, char* errmsg) {
+  if (filename) {
     FILE *fp = fopen(filename, "rb");
     fread(&spc, sizeof(spc), 1, fp);
     fclose(fp);
