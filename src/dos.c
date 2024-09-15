@@ -232,7 +232,7 @@ int dos_max_reached() {
   return result == 0 && globbuf.gl_pathc >= 31;
 }
 
-void dos_load(byte *filename) {
+void dos_load(char *filename) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
   if (filename[0] != '\0') {

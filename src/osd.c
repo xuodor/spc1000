@@ -16,12 +16,12 @@ byte *osd_;
 int osd_dialog_;
 
 glob_t globbuf_;
-byte *osd_dlg_fnames_;
+char *osd_dlg_fnames_;
 int osd_dlg_cnt_;
 int osd_dlg_sel_;
 int osd_dlg_top_;
 int osd_dlg_max_ = 8; /* max visible lines */
-byte *osd_dlg_sel_str_;
+char *osd_dlg_sel_str_;
 osd_dlg_callback osd_dlg_cb_;
 
 /*
@@ -29,8 +29,8 @@ osd_dlg_callback osd_dlg_cb_;
  */
 
 void osd_init() {
-  osd_ = (byte *)malloc(32*16);
-  osd_dlg_sel_str_ = (byte *)malloc(256);
+  osd_ = (byte *)malloc(0x2000);
+  osd_dlg_sel_str_ = (char *)malloc(256);
   osd_toast_begin_ms_ = -1;
   osd_visible_ = 0;
   osd_dialog_ = 0;
@@ -56,7 +56,7 @@ byte *osd_font_data(byte ascii, byte attr) {
   return cgbuf_ + offset;
 }
 
-void osd_print(int x, int y, byte *str, int inverse) {
+void osd_print(int x, int y, char *str, int inverse) {
   int offset = currentPage * 0x200 + y * 32 + x;
 
   byte *dst = osd_ + offset;
@@ -88,7 +88,7 @@ int osd_should_close_toast() {
  *             1 - bottom of the screen
  * @param inverse Inverse attr
  */
-void osd_toast(byte *str, int vloc, int inverse) {
+void osd_toast(char *str, int vloc, int inverse) {
   int len;
 
   if (osd_is_toast_on()) return;
@@ -103,9 +103,9 @@ void osd_toast(byte *str, int vloc, int inverse) {
   int x = (32-len)/2-1;
   int y = (16-1)/2-1;
   int flen = len+2+1;
-  byte *ur = (byte*)calloc(1, len+2+1);
-  byte *mr = (byte*)calloc(1, len+2+1);
-  byte *dr = (byte*)calloc(1, len+2+1);
+  char *ur = (char*)calloc(1, len+2+1);
+  char *mr = (char*)calloc(1, len+2+1);
+  char *dr = (char*)calloc(1, len+2+1);
 
   /* draw border */
   memset(ur, 0x8B, len+2);
@@ -133,7 +133,7 @@ void osd_exit() {
   free(osd_dlg_sel_str_);
 }
 
-byte *_osd_dlg_fstr(int ind) {
+char *_osd_dlg_fstr(int ind) {
   return osd_dlg_fnames_ + ind*9;
 }
 
@@ -145,8 +145,8 @@ void _osd_dlg_update() {
   for (int i = 0; i< MIN(osd_dlg_max_, osd_dlg_cnt_); ++i) {
     int ind = osd_dlg_top_+i;
     int inv = (osd_dlg_sel_ == ind) ? 1: 0;
-    byte *p = _osd_dlg_fstr(ind);
-    byte buf[16];
+    char *p = _osd_dlg_fstr(ind);
+    char buf[16];
     memset(buf, ' ', MAXFL);
     buf[MAXFL] = 0;
     memcpy(buf, p, strlen(p));
@@ -157,7 +157,7 @@ void _osd_dlg_update() {
 /**
  * Open modal dialog.
  */
-void osd_open_dialog(byte *title, byte *globp, osd_dlg_callback cb) {
+void osd_open_dialog(char *title, char *globp, osd_dlg_callback cb) {
   glob(globp, 0, 0, &globbuf_);
   int nfiles = globbuf_.gl_pathc;
   if (nfiles == 0) {
@@ -168,7 +168,7 @@ void osd_open_dialog(byte *title, byte *globp, osd_dlg_callback cb) {
   osd_dlg_cb_ = cb;
   memcpy(osd_, vram_, 0x2000);
   osd_show(1);
-  byte tline[128] = "\x87\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x85";
+  char tline[128] = "\x87\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x8b\x85";
   int tpos = (strlen(tline)-strlen(title))/2;
   if (tpos > 0) memcpy(tline+tpos, title, strlen(title));
   osd_print(10, 2, tline, 0);

@@ -318,7 +318,7 @@ byte RdZ80(register word Addr) {
  * System Snapshot (Z80+Memory+IO+VRAM) Read/Write
  */
 
-int spc_save_snapshot(void) {
+int spc_save_snapshot(char *notused) {
   char name[32];
   time_t t;
   struct tm *tmp;
@@ -348,7 +348,7 @@ int spc_save_snapshot(void) {
   return -3;
 }
 
-void spc_load_snapshot(byte *filename) {
+void spc_load_snapshot(char *filename) {
   if (filename[0] != '\0') {
     FILE *fp = fopen(filename, "rb");
     fread(&spc, sizeof(spc), 1, fp);
@@ -488,7 +488,7 @@ void ProcessSpecialKey(SDL_Keysym sym) {
     break;
 
   case SDLK_PAGEUP: // Image Save
-    if (!spc_save_snapshot()) {
+    if (!spc_save_snapshot(NULL)) {
       simul.curTick = SDL_GetTicks() - simul.baseTick;
       spc.tick = simul.curTick;
       osd_toast("SNAPSHOT TAKEN", 0, 0);

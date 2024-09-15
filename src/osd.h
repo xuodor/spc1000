@@ -4,7 +4,7 @@
 #include "common.h"
 #include "key.h"
 
-typedef void (*osd_dlg_callback)(byte *sel_str);
+typedef void (*osd_dlg_callback)(char *sel_str);
 
 extern byte *osd_;
 extern int osd_visible_;
@@ -15,9 +15,9 @@ int osd_dialog_on();
 byte osd_data(int addr);
 void osd_exit();
 void osd_show(int show);
-void osd_print(int x, int y, byte *str, int inverse);
-void osd_toast(byte *msg, int vloc, int inverse);
-void osd_open_dialog(byte *title, byte *globp, osd_dlg_callback cb);
+void osd_print(int x, int y, char *str, int inverse);
+void osd_toast(char *msg, int vloc, int inverse);
+void osd_open_dialog(char *title, char *globp, osd_dlg_callback cb);
 void osd_close_dialog();
 void osd_process_key(KeyCode key);
 
