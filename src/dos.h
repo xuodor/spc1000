@@ -17,8 +17,8 @@
 typedef unsigned long uint32;
 
 typedef struct {
-  byte buf[FIB_TAP_SIZE + MAX_BODY_TAP];
-  size_t len;
+  byte buf[(FIB_TAP_SIZE + MAX_BODY_TAP)/8+1];
+  unsigned int len;
   int p;
 } DosBuf;
 
@@ -27,8 +27,7 @@ extern "C" {
 #endif
 
 int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time);
-void dos_putc(DosBuf *db, byte b);
-void dos_put_byte(DosBuf *db, byte b);
+void dos_putb(DosBuf *db, int b);
 void dos_rewind(DosBuf *db);
 void dos_reset(DosBuf *db);
 int dos_hasdata(DosBuf *db);

@@ -1,4 +1,3 @@
-#include <glob.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,24 +20,32 @@ typedef struct {
 DosBuf *dosbuf_;
 LoadData load_params_;
 
-byte _9bits_to_byte(byte* buf) {
+byte _9bits_to_byte(byte *buf, int bp) {
   byte res = 0;
-  buf++;
-  for (int i = 0; i < 8; ++i) {
-    res += ((buf[i] - '0') << (7 - i));
+  bp++;
+  for (int i = 7; i >= 0; --i,++bp) {
+    int k = bp >> 3;
+    int s = 7-(bp&7);
+    res |= ((buf[k]>>s)&1)<<i;
   }
   return res;
 }
 
-void dos_putc(DosBuf *db, byte b) {
-  db->buf[db->p++] = b;
+void dos_putb(DosBuf *db, int b) {
+  if (b==1) {
+    int bp = db->p;
+    int k = bp >> 3;
+    int s = 7-(bp&7);
+    db->buf[k] |= 1<<s;
+  }
+  db->p++;
   db->len++;
 }
 
 void dos_put_byte(DosBuf *db, byte b) {
-  dos_putc(db, '1');
+  dos_putb(db, 1);
   for (int i = 7; i >= 0; --i)
-    dos_putc(db, (b >> i) & 1 ? '1' : '0');
+    dos_putb(db, (b >> i) & 1);
 }
 
 void dos_rewind(DosBuf *db) {
@@ -46,25 +53,29 @@ void dos_rewind(DosBuf *db) {
 }
 
 void dos_reset(DosBuf *db) {
-  memset(db->buf, 0, sizeof db->buf);
+  memset(db->buf, 0, sizeof(db->buf));
   db->len = 0;
   db->p = 0;
 }
 
 int dos_hasdata(DosBuf *db) {
-  return db->len > 0;
+  return db->p < db->len;
 }
 
 int dos_read(DosBuf* db) {
   if (db->p < db->len) {
-    return db->buf[db->p++] - '0';
+    int bp = db->p;
+    int k = bp >> 3;
+    int s = 7-(bp&7);
+    db->p++;
+    return (db->buf[k]>>s)&1;
   } else {
     return -1;
   }
 }
 
 byte dos_get_command(DosBuf *db) {
-  return dos_hasdata(db) ? _9bits_to_byte(db->buf+OFFSET_PREAMBLE) : 0;
+  return _9bits_to_byte(db->buf, OFFSET_PREAMBLE);
 }
 
 uint16_t read_checksum(byte* buf, int nbytes) {
@@ -87,36 +98,30 @@ uint16_t calc_checksum(byte* buf, int nbytes) {
 
 }
 
-byte get_command_code(byte* buf) {
-  byte *p = buf + OFFSET_PREAMBLE;
-  return _9bits_to_byte(p);
-}
-
 void dos_generate_tap_bits(DosBuf *db, byte *fcb, byte *body, size_t body_len) {
-  dos_reset(db);
-
   /* FCB */
-  for (int i = 0; i < 0x55f0; ++i) dos_putc(db, '0');
-  for (int i = 0; i < 0x28; ++i) dos_putc(db, '1');
-  for (int i = 0; i < 0x28; ++i) dos_putc(db, '0');
-  dos_putc(db, '1');
+  for (int i = 0; i < 0x55f0; ++i) dos_putb(db, 0);
+  for (int i = 0; i < 0x28; ++i) dos_putb(db, 1);
+  for (int i = 0; i < 0x28; ++i) dos_putb(db, 0);
+  dos_putb(db, 1);
   for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
-  dos_putc(db, '1');
-  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
+  dos_putb(db, 1);
+  for (int i = 0; i < 0x100; ++i) dos_putb(db, 0);
   for (int i = 0; i < 0x80 + 2; ++i) dos_put_byte(db, fcb[i]);
-  dos_putc(db, '1');
+  dos_putb(db, 1);
 
   /* Body */
-  for (int i = 0; i < 0x2af8; ++i) dos_putc(db, '0');
-  for (int i = 0; i < 0x14; ++i) dos_putc(db, '1');
-  for (int i = 0; i < 0x14; ++i) dos_putc(db, '0');
-  dos_putc(db, '1');
+  for (int i = 0; i < 0x2af8; ++i) dos_putb(db, 0);
+  for (int i = 0; i < 0x14; ++i) dos_putb(db, 1);
+  for (int i = 0; i < 0x14; ++i) dos_putb(db, 0);
+  dos_putb(db, 1);
   for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
-  dos_putc(db, '1');
-  for (int i = 0; i < 0x100; ++i) dos_putc(db, '0');
+  dos_putb(db, 1);
+/*
+  for (int i = 0; i < 0x100; ++i) dos_putb(db, 0);
   for (int i = 0; i < body_len+2; ++i) dos_put_byte(db, body[i]);
-  dos_putc(db, '1');
-
+  dos_putb(db, 1);
+*/
   dos_rewind(db);
 }
 
@@ -218,10 +223,10 @@ void dos_build_load_resp(DosBuf *db, char *msg, char *data, size_t body_len) {
   free(fcb);
 }
 
-void osd_set_filename_(byte* buf, char* filename) {
-  byte *p = buf + OFFSET_PREAMBLE + 9;
+void osd_set_filename_(byte *buf, char* filename) {
+  int p = OFFSET_PREAMBLE + 9;
   for (int i = 0; i < 7; ++i) {
-    if ((filename[i] = _9bits_to_byte(p)) == 0) break;
+    if ((filename[i] = _9bits_to_byte(buf, p)) == 0) break;
     p += 9;
   }
   if (filename[0] != '\0') strcat(filename, ".TAP");
@@ -237,7 +242,7 @@ void dos_load(char *filename, char *errmsg) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
   if (filename) {
-    cas->rfp = fopen(filename, "rb");
+    cas->rfp = ext_fopen(filename, "rb");
     /* File open error. Notify user with an error. */
     if (!cas->rfp) {
       dos_build_load_resp(load_params_.dos_buf, "FILE ERROR", "\0\0", 2);
@@ -258,6 +263,8 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   char filename[16+1];
   byte cmd = dos_get_command(db);
   int res = 0;
+
+  printf("dos_exec command: %d cas:%p l:%d df:%d\n", cmd, cas, db->len, db->p);
 
   switch (cmd) {
   case DOSCMD_VIEW:
@@ -301,7 +308,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
       /* osd_toast("MAX FILES REACHED", 0, 0); */
     }
     dos_reset(db);
-    if ((cas->wfp = fopen(filename, "wb")) == NULL) {
+    if ((cas->wfp = ext_fopen(filename, "wb")) == NULL) {
       osd_toast("SAVE ERROR", 0, 0);
     }
     cas->button = CAS_REC;
@@ -337,6 +344,8 @@ void dos_dump(byte *p, size_t dl) {
   if (dl % 8) puts(s);
 }
 
+// NEEDS WORKING. fcb contains '0' and '1' chars
+// Needs converstion to bit 0/1 first
 uint16_t info_dosv_fcb(byte* fcb) {
   byte fcb_name[17+1];
   uint16_t len;
@@ -345,10 +354,9 @@ uint16_t info_dosv_fcb(byte* fcb) {
   uint16_t checksum;
   byte res[0x80+2+1];
 
-  byte *p = fcb + OFFSET_PREAMBLE;
-
+  int p = OFFSET_PREAMBLE;
   for (int i = 0; i < 0x80+2; ++i, p += 9) {
-    res[i] = _9bits_to_byte(p);
+    res[i] = _9bits_to_byte(fcb, p);
   }
 
   dos_dump(res, 0x80+2);
@@ -362,7 +370,7 @@ uint16_t info_dosv_fcb(byte* fcb) {
   printf("len: %d(0x%x)\n", (unsigned int)len, (unsigned int)len);
   printf("name: [%s]\n", fcb_name);
   printf("start: 0x%x\n", (unsigned int)start);
-  printf("exec: 0x%x\n", (unsigned int)ipl);
+  printf("exec: 0x%x\n", (unsigned int)exec);
   printf("checksum: read: 0x%04x calc: 0x%04x\n",
          checksum,
          calc_checksum(res, 0x80));
@@ -374,8 +382,8 @@ void info_file_body(byte* buf, uint16_t len) {
   byte *res;
 
   res = (byte *)malloc(len+2);
-  for (int i = 0; i < len+2; ++i, buf += 9) {
-    res[i] = _9bits_to_byte(buf);
+  for (int i = 0, p = 0; i < len+2; ++i, p += 9) {
+    res[i] = _9bits_to_byte(buf, p);
   }
   puts("body:");
   dos_dump(res, len+2);

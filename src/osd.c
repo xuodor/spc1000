@@ -1,6 +1,5 @@
 #include "osd.h"
 
-#include <glob.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -4,7 +4,7 @@ build/bin/Makefile: CMakeLists.txt
 	mkdir -p build/bin
 	cmake -Bbuild/bin -H.
 
-spcdos: src/spcmain.c src/dos.asm src/dos.c src/cassette.h src/cassette.c src/dos.h src/osd.h src/osd.c
+spcdos: src/spcmain.c src/dos.asm src/dos.c src/cassette.h src/cassette.c src/dos.h src/osd.h src/osd.c src/sysdep.h src/sysdep.c
 	z80asm -i src/dos.asm -o dos
 	python tool/gen_romc.py ./dos > src/rom.c
 	rm dos

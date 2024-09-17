@@ -1,5 +1,14 @@
 #include "sysdep.h"
 #include <time.h>
+#include <unistd.h>
+
+void init_fs() {
+  chdir(DIR_PATH);
+}
+
+FILE *ext_fopen(const char *pathname, const char *mode) {
+  return fopen(pathname, mode);
+}
 
 uint32_t get_timestamp_ms() {
  struct timespec tms;

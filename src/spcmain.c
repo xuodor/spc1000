@@ -14,6 +14,7 @@
 #include "spc1000.h"
 #include "SDL.h"
 #include "MC6847.h"
+#include "sysdep.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -289,6 +290,7 @@ void InitIOSpace(void) {
     spc.IO.keyMatrix[i] = 0xff;
 
   dosbuf_ = (DosBuf *)malloc(sizeof(DosBuf));
+  dos_reset(dosbuf_);
 }
 
 /*************************************************************/
@@ -750,6 +752,7 @@ int main(int argc, char *argv[]) {
 
   if (spcConfig.keyLayout) setModernKeyLayout();
   cgbuf_ = &spc.RAM[0x524A];
+  init_fs();
   InitIOSpace();
   InitMC6847(spc.IO.VRAM, spcConfig.scale,
 	     spcConfig.font ? cgbuf_ : 0);
