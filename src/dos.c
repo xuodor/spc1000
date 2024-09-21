@@ -241,7 +241,8 @@ int dos_max_reached() {
 void dos_load(char *filename, char *errmsg) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
-  if (filename) {
+  printf("rfp:%p fname:%s\n", cas->rfp, filename);
+  if (filename && filename[0] != '\0') {
     cas->rfp = ext_fopen(filename, "rb");
     /* File open error. Notify user with an error. */
     if (!cas->rfp) {

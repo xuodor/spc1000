@@ -32,6 +32,7 @@ void dos_rewind(DosBuf *db);
 void dos_reset(DosBuf *db);
 int dos_hasdata(DosBuf *db);
 int dos_read(DosBuf* db);
+void dos_build_load_resp(DosBuf *db, char *msg, char *data, size_t body_len);
 
 extern DosBuf *dosbuf_;
 

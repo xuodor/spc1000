@@ -24,6 +24,9 @@ void CloseMC6847(void);
 void SDLWaitQuit(void);
 void ScaleWindow(int scale);
 
-int can_display_char();
+int vdg_display_char();
+void vdg_save_page();
+void vdg_restore_page();
+char *vdg_text_pos(int x, int y);
 
 #endif // __MC6847_H__

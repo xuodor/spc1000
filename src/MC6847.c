@@ -10,12 +10,15 @@
 
 #include "SDL.h"
 
+#define PAGE_SIZE (32*16)
+
 typedef unsigned char byte;
 
 byte *vram_;
 static byte *spc_;
 
 static byte *FONT_BUF_;
+static byte *vdg_page_buf;
 
 int currentPage = 0; // current text page
 
@@ -243,14 +246,24 @@ void UpdateRect(Screen *s, Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
   SDL_RenderPresent(renderer_);
 }
 
+void vdg_save_page() {
+  char *page_addr = spc_ + currentPage * 0x200;
+  memcpy(vdg_page_buf, page_addr, PAGE_SIZE);
+  memcpy(vdg_page_buf + PAGE_SIZE, page_addr + 0x800, PAGE_SIZE);
+}
+
+void vdg_restore_page() {
+  char *page_addr = spc_ + currentPage * 0x200;
+  memcpy(page_addr, vdg_page_buf, PAGE_SIZE);
+  memcpy(page_addr + 0x800, vdg_page_buf + PAGE_SIZE, PAGE_SIZE);
+}
+
+inline char *vdg_text_pos(int x, int y) {
+  return spc_ + currentPage * 0x200 + y * 32 + x;
+}
+
 byte vram_data(int addr) {
-  if (!can_display_char()) return spc_[addr];
-  if (screenMode == 0) {
-    byte osdb = osd_data(addr);
-    return osd_dialog_on() ? osdb : (osdb == 0 ? spc_[addr] : osdb);
-  } else {
-    return osd_visible_ ? osd_data(addr) : spc_[addr];
-  }
+  return spc_[addr];
 }
 
 /**
@@ -514,6 +527,8 @@ void InitMC6847(byte *mem, int scale, byte *cgbuf) {
   vram_ = spc_;
   FONT_BUF_ = cgbuf ? cgbuf : CGROM;
 
+  vdg_page_buf = (byte *)malloc(PAGE_SIZE*2);
+
   if ((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1)) {
     printf("Could not initialize SDL: %s.\n", SDL_GetError());
     exit(-1);
@@ -551,7 +566,6 @@ void InitMC6847(byte *mem, int scale, byte *cgbuf) {
   SDL_RenderSetLogicalSize(renderer_, 512, 384);
 
   InitWindow(scale);
-  osd_ = (byte *)malloc(0x2000);
 
   atexit(SDL_Quit);
   scr_init_bpp(&main_screen_);
@@ -692,6 +706,6 @@ void SDLWaitQuit(void) {
   SDL_Quit();
 }
 
-int can_display_char() {
-  return screenMode == 0 || screenMode == 5;
+int vdg_display_char() {
+  return screenMode == 0;
 }

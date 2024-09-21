@@ -68,8 +68,11 @@ int CasRead(Cassette *cas) {
 
     cas->rdVal = ReadVal(cas);
 
-    if (cas->rdVal == -1)
-      break;
+    if (cas->rdVal == -1) {
+      dos_build_load_resp(dosbuf_, "FILE END", "\0\0", 2);
+      cas->rdVal = 1;
+      FCLOSE(cas->rfp);
+    }
 
     bitTime = (cas->rdVal == 0) ? 56 : (cas->rdVal == 1) ? 112 : 0;
   }
