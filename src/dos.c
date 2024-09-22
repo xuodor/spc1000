@@ -19,6 +19,7 @@ typedef struct {
 
 DosBuf *dosbuf_;
 LoadData load_params_;
+int reload_;
 
 byte _9bits_to_byte(byte *buf, int bp) {
   byte res = 0;
@@ -299,9 +300,6 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     osd_set_filename_(db->buf, filename);
     if (filename[0] == '\0') {
       strcpy(filename, "NONAME.TAP");
-      // hack
-      extern uint8_t mem[];
-      memcpy(mem+0x1397, "NONAME\0", 7);
     }
     /* TODO: Prevent overwrite. For now we always allow it */
     dos_reset(db);
@@ -309,12 +307,21 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
       osd_toast("SAVE ERROR", 0, 0);
     }
     cas->button = CAS_REC;
+    reload_ = 1;
     res = 1;
     break;
   case DOSCMD_DEL:
     osd_set_filename_(db->buf, filename);
     dos_reset(db);
     ext_remove(filename);
+    cas->button = CAS_STOP;
+    if (cas->rfp) FCLOSE(cas->rfp);
+    break;
+  case DOSCMD_END:
+    if (reload_) {
+      reload_dir();
+      reload_ = 0;
+    }
     /* fall through */
   default:
     /* No cmd received. Emulate STOP button. */

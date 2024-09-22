@@ -7,6 +7,7 @@
 #define DOSCMD_LOAD 0xd4
 #define DOSCMD_VIEW 0xd5
 #define DOSCMD_DEL  0xd6
+#define DOSCMD_END  0
 
 #define OFFSET_PREAMBLE (0x55f0 + 0x28 + 0x28 + 1)
 #define OFFSET_FCB_EXT ((1 + 17 + 2 + 2 + 2) * 9)
