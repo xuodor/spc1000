@@ -297,7 +297,12 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
     break;
   case DOSCMD_SAVE:
     osd_set_filename_(db->buf, filename);
-    if (filename[0] == '\0') strcpy(filename, "NONAME.TAP");
+    if (filename[0] == '\0') {
+      strcpy(filename, "NONAME.TAP");
+      // hack
+      extern uint8_t mem[];
+      memcpy(mem+0x1397, "NONAME\0", 7);
+    }
     /* TODO: Prevent overwrite. For now we always allow it */
     dos_reset(db);
     if ((cas->wfp = ext_fopen(filename, "wb")) == NULL) {
