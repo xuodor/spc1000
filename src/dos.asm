@@ -258,15 +258,17 @@ DOSDEL:
     org 3B0EH
 CBRSHM:
     POP HL
-    CALL DOSEND
+    XOR A
+    JP DOSEND
 
 ;;; Rename LET to DIR
     seek 679BH
     org 679BH
-    DEFB 44H, 49H, 0D2H                 ; DOS
+    DEFB 44H, 49H, 0D2H         ; DOS
 
-;;; Add DEL cmd. ERROR -> ERR
+;;; Add DEL cmd
+;;; ERROR -> ERM
     seek 680CH
     org 680CH
     DEFB 44H, 45H, 0CCH         ; DEL
-    DEFB 45H, 52H, 0D2H         ; ERR
+    DEFB 45H, 52H, 0CDH         ; ERM

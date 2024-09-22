@@ -10,6 +10,9 @@ FILE *ext_fopen(const char *pathname, const char *mode) {
   return fopen(pathname, mode);
 }
 
+void ext_remove(const char *pathname) {
+  remove(pathname);
+}
 uint32_t get_timestamp_ms() {
  struct timespec tms;
 

@@ -11,6 +11,7 @@ extern "C" {
 #define DIR_PATH "disk"
 
 FILE *ext_fopen(const char *pathname, const char *mode);
+void ext_remove(const char *pathname);
 void init_fs();
 uint32_t get_timestamp_ms();
 

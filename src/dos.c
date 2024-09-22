@@ -241,8 +241,7 @@ int dos_max_reached() {
 void dos_load(char *filename, char *errmsg) {
   Cassette *cas = load_params_.cas;
   if (cas->rfp) FCLOSE(cas->rfp);
-  printf("rfp:%p fname:%s\n", cas->rfp, filename);
-  if (filename && filename[0] != '\0') {
+  if (filename && filename[0]) {
     cas->rfp = ext_fopen(filename, "rb");
     /* File open error. Notify user with an error. */
     if (!cas->rfp) {
@@ -264,8 +263,6 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   char filename[16+1];
   byte cmd = dos_get_command(db);
   int res = 0;
-
-  printf("dos_exec command: %d cas:%p l:%d df:%d\n", cmd, cas, db->len, db->p);
 
   switch (cmd) {
   case DOSCMD_VIEW:
@@ -301,13 +298,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   case DOSCMD_SAVE:
     osd_set_filename_(db->buf, filename);
     if (filename[0] == '\0') strcpy(filename, "NONAME.TAP");
-    if (access(filename, F_OK) == 0) {
-      /* TODO: Prevent overwrite. For now we always allow it */
-    }
-    if (dos_max_reached()) {
-      /* Just a warning. */
-      /* osd_toast("MAX FILES REACHED", 0, 0); */
-    }
+    /* TODO: Prevent overwrite. For now we always allow it */
     dos_reset(db);
     if ((cas->wfp = ext_fopen(filename, "wb")) == NULL) {
       osd_toast("SAVE ERROR", 0, 0);
@@ -318,7 +309,7 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   case DOSCMD_DEL:
     osd_set_filename_(db->buf, filename);
     dos_reset(db);
-    remove(filename);
+    ext_remove(filename);
     /* fall through */
   default:
     /* No cmd received. Emulate STOP button. */
