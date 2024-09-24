@@ -398,8 +398,10 @@ void OutZ80(register word Port, register byte Value) {
     }
     spc.IO.GMODE = Value;
     DLOG("GMode:%02X\n", Value);
-  } else if ((Port & 0xE000) == 0x6000) {
+  } else if (Port == 0x6000) {
     CasIOWrite(&spc.IO.cas, Value);
+  } else if (Port == 0x6001) {
+    CasWrite(&spc.IO.cas, Value);
   } else if ((Port & 0xFFFE) == 0x4000) {
     if (Port & 0x01) // Data
     {

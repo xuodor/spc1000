@@ -13,6 +13,11 @@ DEPRT:      EQU 07F3H
 TABPRT:     EQU 0802H
 CR2:        EQU 0823H
 PRTSDC:     EQU 07E1H
+MOTCH:      EQU 0344H
+SPPRT:      EQU 0862H
+HEX2PR:     EQU 0562H
+VBLOAD:     EQU 0259H
+MOTON:      EQU 02E0H
 
 ;;; BASIC
 BREAK:      EQU 16A2H
@@ -47,6 +52,174 @@ FGDIR:      EQU 0D5H
 FGDEL:      EQU 0D6H
 
     incbin 'src/spcall.rom'
+
+;;; Rewrite cassette IOCS to speed up read/write
+;;; No more timing-based access but direct bit 0
+;;; manipulation.
+    seek 019DH
+    org  019DH
+CLOAD4:
+    POP HL
+    POP BC
+    POP DE
+    JP CREND
+
+    ;; Just check Shift+BREAK
+    seek 0230h
+    org 0230h
+EDGE:
+MVRFY4:
+    LD A,80H
+    IN A,(0)
+    AND 12H
+    RET NZ
+    SCF
+    RET
+    ;; Signals the read start
+CRBEG:
+    LD BC,6000H
+    LD A,(IO6000)
+    SET 5,A
+    OUT (C),A
+    LD HL,2828H
+    RET
+    ;; Mark the end of reading
+CREND:
+    PUSH BC
+    LD BC,6000H
+    LD A,(IO6000)
+    RES 5,A
+    OUT (C),A
+    POP BC
+    CALL MOTCH
+    EI
+    RET
+    ;;
+
+    seek 0289H
+    org 0289H
+    CALL DISCB1
+
+    seek 0291H
+    org 0291H
+MKRD:
+    PUSH BC
+    PUSH DE
+    PUSH HL
+    CALL CRBEG
+
+    ;; Do nothing in WAITR
+    seek 03C4H
+    org 03C4H
+WAITR:
+    RET
+
+    seek 02D9H
+    org 02D9H
+    CALL DISCB1
+
+    ;; Write 0 by clearing bit 0
+    seek 03CBH
+    org 03CBH
+WRITES:
+    PUSH AF
+    PUSH BC
+    LD BC,6001H
+    XOR A
+    OUT (C),A
+    POP BC
+    POP AF
+    RET
+
+    ;;  Write 1 by setting bit 0
+    seek 03EDH
+    org  03EDH
+WRITEL:
+    PUSH AF
+    PUSH BC
+    LD BC,6001H
+    LD A,1
+    OUT (C),A
+    POP BC
+    POP AF
+    RET
+DISCB1:
+    CALL EDGE
+    CALL WAITR
+    LD A,40H
+    IN A,(1)
+    RET
+
+    seek 2800H
+    org 2800H
+    LD A,0D5h
+    CALL DOSREQ
+
+    DI
+    PUSH DE
+    PUSH BC
+    PUSH HL
+    LD D,0D2h
+    LD E,0CCh
+    LD BC,0002H
+    LD HL,FILMOD
+    CALL MOTON
+    CALL MKRD
+
+    CALL EDGE
+    LD A,40H
+    IN A,(2)
+
+    LD DE,ENDMK
+    CALL DEPRT
+    CALL CR2
+
+CCLOAD0:
+    PUSH DE
+    PUSH BC
+    PUSH HL
+    LD H,02H
+
+    LD BC,4000H
+    LD A,14
+    OUT (C),A
+
+    CALL EDGE
+    CALL WAITR
+    LD A,40H
+    IN A,(2)
+    AND 80H
+    JP Z,CCLOAD0
+    LD D,H
+    POP HL
+    POP BC
+    PUSH BC
+    PUSH HL
+CCLOAD1:
+    CALL VBLOAD
+    LD (HL),A
+    CALL HEX2PR
+    CALL SPPRT
+    INC HL
+    DEC BC
+    LD A,B
+    OR C
+    JP NZ,CCLOAD1
+
+    POP HL
+    POP BC
+    POP DE
+    CALL MOTCH
+    CALL CR2
+    EI
+    XOR A
+    CALL DOSREQ
+    RET
+
+ENDMK:
+    DEFM 'ENDMK'
+    DEFB 0
+
 
 ;;; Repurpose LET to DIR
     seek 2F98H
@@ -104,7 +277,7 @@ DOSREQ:
     JR Z, DOSREQ1
 
     ;; Do not display WRITING: <FILNAME>
-    LD HL,0C18H                 ; JR 00ACH
+    LD HL,0C18H                 ; JR FSAVE1
     LD (009FH),HL
     CALL FSAVE
 DOSREQ1:
@@ -114,7 +287,7 @@ DOSREQ1:
     LD (IO6000),A
 
     ;; Restore the code
-    LD HL,11D5H                 ; PUSH DE, LD DE,
+    LD HL,11D5H
     LD (009FH),HL
     POP BC
     RET

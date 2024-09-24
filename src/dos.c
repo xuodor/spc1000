@@ -252,7 +252,6 @@ void dos_load(char *filename, char *errmsg) {
     dos_build_load_resp(load_params_.dos_buf, errmsg, "\0\0", 2);
   }
   cas->button = CAS_PLAY;
-  cas->startTime = cas_start_time();
   ResetCassette(cas);
 }
 
@@ -265,12 +264,12 @@ int dos_exec(DosBuf *db, Cassette *cas, uint32 start_time) {
   byte cmd = dos_get_command(db);
   int res = 0;
 
+  printf("command:%02x\n", cmd);
   switch (cmd) {
   case DOSCMD_VIEW:
     dos_reset(db);
     dos_build_list_resp(db);
     cas->button = CAS_PLAY;
-    cas->startTime = start_time;
     res = 1;
     break;
   case DOSCMD_LOAD:

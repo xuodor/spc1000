@@ -17,12 +17,6 @@ typedef struct {
   int motor; // Motor Status
   int pulse; // Motor Pulse (0->1->0) causes motor state to flip
   int button;
-  int rdVal;
-  uint32_t startTime;
-  uint32_t cnt0, cnt1;
-
-  int wrVal;
-  uint32_t wrRisingT; // rising time
 
   FILE *wfp;
   FILE *rfp;
