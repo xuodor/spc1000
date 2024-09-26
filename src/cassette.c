@@ -113,6 +113,8 @@ void CasIOWrite(Cassette *cas, byte Value) {
     }
   } // != CAS_STOP
 
+  if (Value & 0x80) CasWrite(cas, Value & 0x1);
+
   CasDosCommand(cas, Value);
 }
 

@@ -124,9 +124,13 @@ WAITR:
 WRITES:
     PUSH AF
     PUSH BC
-    LD BC,6001H
-    XOR A
+    LD BC,SMODE
+    LD A,(IO6000)
+    RES 0,A
+    SET 7,A
     OUT (C),A
+    RES 7,A
+    LD (IO6000),A
     POP BC
     POP AF
     RET
@@ -137,9 +141,13 @@ WRITES:
 WRITEL:
     PUSH AF
     PUSH BC
-    LD BC,6001H
-    LD A,1
+    LD BC,SMODE
+    LD A,(IO6000)
+    SET 0,A
+    SET 7,A
     OUT (C),A
+    RES 7,A
+    LD (IO6000),A
     POP BC
     POP AF
     RET
@@ -149,77 +157,6 @@ DISCB1:
     LD A,40H
     IN A,(1)
     RET
-
-    seek 2800H
-    org 2800H
-    LD A,0D5h
-    CALL DOSREQ
-
-    DI
-    PUSH DE
-    PUSH BC
-    PUSH HL
-    LD D,0D2h
-    LD E,0CCh
-    LD BC,0002H
-    LD HL,FILMOD
-    CALL MOTON
-    CALL MKRD
-
-    CALL EDGE
-    LD A,40H
-    IN A,(2)
-
-    LD DE,ENDMK
-    CALL DEPRT
-    CALL CR2
-
-CCLOAD0:
-    PUSH DE
-    PUSH BC
-    PUSH HL
-    LD H,02H
-
-    LD BC,4000H
-    LD A,14
-    OUT (C),A
-
-    CALL EDGE
-    CALL WAITR
-    LD A,40H
-    IN A,(2)
-    AND 80H
-    JP Z,CCLOAD0
-    LD D,H
-    POP HL
-    POP BC
-    PUSH BC
-    PUSH HL
-CCLOAD1:
-    CALL VBLOAD
-    LD (HL),A
-    CALL HEX2PR
-    CALL SPPRT
-    INC HL
-    DEC BC
-    LD A,B
-    OR C
-    JP NZ,CCLOAD1
-
-    POP HL
-    POP BC
-    POP DE
-    CALL MOTCH
-    CALL CR2
-    EI
-    XOR A
-    CALL DOSREQ
-    RET
-
-ENDMK:
-    DEFM 'ENDMK'
-    DEFB 0
-
 
 ;;; Repurpose LET to DIR
     seek 2F98H
