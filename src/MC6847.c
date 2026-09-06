@@ -41,7 +41,7 @@ int is_fullscreen_ = 0;
 
 extern unsigned char CGROM[]; // CGROM, defined at the end of this file
 int sdlLockReq;
-int screenMode;
+int paletteIndex;
 Uint32 colorTbl[6][4];  // Color Table for text and mid,hi-res graphics
 Uint32 semiColorTbl[9]; // Color Table for semigraphic
 
@@ -85,7 +85,7 @@ void DrawSingleDot(Screen *s, unsigned char *addr, Uint32 c) {
   p[2] = ((c & fmt->Rmask) >> fmt->Rshift) << fmt->Rloss;
 }
 
-// Single char dot consists of 2 consecutive dots.
+// Single char dot consists of 2 consecutive pixels.
 void DrawCharDot(Screen *s, int x, int y, Uint32 c) {
   byte *addr = offset(s, x, y);
   DrawSingleDot(s, addr         , c);
@@ -160,7 +160,7 @@ static void PutChar(Screen *s, int x, int y, int ascii, int attr) {
 }
 
 void SetMidResBuf(Screen *s, unsigned char *addr, unsigned char data) {
-  Uint32 *scrnColor = colorTbl[screenMode];
+  Uint32 *scrnColor = colorTbl[paletteIndex];
   Uint32 c = scrnColor[(0xc0 & data) >> 6];
   int i;
   for (i = 0; i < 4; ++i) {
@@ -204,6 +204,53 @@ static void PutMidGr(Screen *s, int pos, unsigned char data) {
 }
 
 /**
+ * Put 128x96 resolution graphics mode. One of the 2 pages is selected
+ * with |currentPage|.
+ * @param pos byte data position in flat byte index. [0..6144)
+ * @param data a byte data to be put
+ */
+static void PutPagedGr(Screen *s, int pos, unsigned char data) {
+  int i, k;
+  int x, y;
+  Uint32 fgColor = colorTbl[paletteIndex][1];
+  Uint32 bgColor = colorTbl[paletteIndex][0];
+  byte *base, *addr;
+
+  if (pos < 0 || pos >= 6144)
+    return;
+
+  x = (pos % 32) * 4;
+  y = pos / 32;
+
+  base = addr = (byte *)s->surface->pixels + 4 * (s->surface->pitch * y + s->bpp * x);
+
+  // Bg for the scan line effect for the top line.
+  for (i = 0; i < 4*4; i++) {
+    DrawSingleDot(s, addr, bgColor);
+    addr += s->bpp;
+  }
+
+  byte mask = 1 << (currentPage % 2 ? 0 : 1);
+  // Fg for the next 3 lines.
+  for (k = 0; k < 3; ++k) {
+    base += s->surface->pitch;
+    addr = base;
+    for (i = 0; i < 4; i++) {
+      byte shift = (3-i) << 1; // 6 4 2 0
+      byte b2 = (data >> shift) & 0x3;
+      Uint32 color = (b2 & mask) ? fgColor : bgColor;
+      DrawSingleDot(s, addr, color);
+      addr += s->bpp;
+      DrawSingleDot(s, addr, color);
+      addr += s->bpp;
+      DrawSingleDot(s, addr, color);
+      addr += s->bpp;
+      DrawSingleDot(s, addr, color);
+    }
+  }
+}
+
+/**
  * Put Hi-resolution graphics pattern for a byte data
  * @param pos byte data position in flat byte index. [0..6144]
  * @param data a byte data to be put
@@ -211,8 +258,8 @@ static void PutMidGr(Screen *s, int pos, unsigned char data) {
 static void PutHiGr(Screen *s, int pos, unsigned char data) {
   int i;
   int x, y;
-  Uint32 fgColor = colorTbl[screenMode][1];
-  Uint32 bgColor = colorTbl[screenMode][0];
+  Uint32 fgColor = colorTbl[paletteIndex][1];
+  Uint32 bgColor = colorTbl[paletteIndex][0];
   byte *base, *addr;
 
   if (pos < 0 || pos >= 6144)
@@ -221,11 +268,15 @@ static void PutHiGr(Screen *s, int pos, unsigned char data) {
   y = pos / 32;
 
   base = addr = offset(s, x, y);
+
+  // A single dot maps to 4 pixels.
+  // Bg for scanline effect for top line.
   for (i = 0; i < 16; i++) {
     DrawSingleDot(s, addr, bgColor);
     addr += s->bpp;
   }
-  addr = base;
+  addr = base + s->surface->pitch;
+  // Fg color for the bottome line.
   for (i = 0; i < 8; i++) {
     Uint32 color = (data & (0x80 >> i)) ? fgColor : bgColor;
     DrawSingleDot(s, addr, color);
@@ -332,16 +383,18 @@ void UpdateMC6847Gr(int pos) {
       return;
 
   if (pos != MC6847_UPDATEALL) {
-    if (screenMode <= 3)
+    if (paletteIndex <= 3)
       PutMidGr(screen_, pos, vram_data(pos));
     else
       PutHiGr(screen_, pos, vram_data(pos));
   } else {
-    for (i = 0; i < 6144; i++)
-      if (screenMode <= 3)
-        PutMidGr(screen_, i, vram_data(i));
-      else
-        PutHiGr(screen_, i, vram_data(i));
+    if (paletteIndex == 1) {
+      for (i = 0; i < 6144; ++i) PutPagedGr(screen_, i, vram_data(i));
+    } else if (paletteIndex <= 3) {
+      for (i = 0; i < 6144; i++)  PutMidGr(screen_, i, vram_data(i));
+    } else {
+      for (i = 0; i < 6144; i++) PutHiGr(screen_, i, vram_data(i));
+    }
   }
 
   if (sdlLockReq)
@@ -360,7 +413,7 @@ void UpdateMC6847Gr(int pos) {
 }
 
 /**
- * Set Video mode of MC6874
+ * Set Video mode of MC6847
  * @param command one from { SET_TEXTPAGE, SET_GRAPHIC, SET_TEXTMODE }
  * @param param argument for the command. pagenumber for text mode, gmode for
  * graphic mode
@@ -368,14 +421,14 @@ void UpdateMC6847Gr(int pos) {
 int SetMC6847Mode(int command, int param) {
   SDL_Rect video_rect;
   Uint32 bgColor = SDL_MapRGB(screen_->surface->format, 0, 0, 0);
-  int prevScreenMode;
+  int prevPalette;
 
   video_rect.x = 0;
   video_rect.y = 0;
   video_rect.w = width_;
   video_rect.h = height_;
 
-  prevScreenMode = screenMode;
+  prevPalette = paletteIndex;
   switch (command) {
   case SET_TEXTPAGE:
     currentPage = param;
@@ -383,31 +436,40 @@ int SetMC6847Mode(int command, int param) {
     break;
   case SET_GRAPHIC:
     switch (param & 0x8e) {
-    case 0x80: // 128x96, not implemented
-    case 0x0a: // color
-    case 0x0c: // mono
-      screenMode = 2;
+    case 0x08: // 128x96 (CG3)
+      // This is not supported by BASIC. Modify the table SCRTAB to enable it:
+      // POKE &H1C15, 8 : Set the mode to MC6847 (to restore, put 0x0a)
+      // POKE &H1C11, 160 : SCREEN _,_,2 supports 128x96 (to restore, put 0x80)
+      // And then use the following command to specify the graphics page:
+      // SCREEN 2,2,2 : Page 1
+      // SCREEN 3,3,2 : Page 2
+      // From "SPC-1000 Graphics page II", by Junhwa Lee,
+      //   Microsoftware March '85
+      paletteIndex = 1;
+      currentPage = (param & 0x30) >> 4;
       break;
-    case 0x8a: // color
-    case 0x8c: // mono
-      screenMode = 3;
+    case 0x0a: // 128x192 (RG3, Green)
+      paletteIndex = 2;
       break;
-    case 0x0e:
-      screenMode = 4;
+    case 0x8a: // 128x192 (RG3, Buff)
+      paletteIndex = 3;
       break;
-    case 0x8e:
-      screenMode = 5;
+    case 0x0e: // 256x192 (RG4, Green)
+      paletteIndex = 4;
+      break;
+    case 0x8e: // 256x192 (RG4, Buff)
+      paletteIndex = 5;
       break;
     default:
-      screenMode = 5;
+      paletteIndex = 5;
       break;
     }
-    if (prevScreenMode != screenMode)
+    if (prevPalette != paletteIndex)
       UpdateMC6847Gr(MC6847_UPDATEALL);
     break;
   case SET_TEXTMODE:
     currentPage = (param & 0x30) >> 4;
-    screenMode = 0;
+    paletteIndex = 0;
     if (sdlLockReq)
       if (SDL_LockSurface(screen_->surface) < 0)
         return -1;
@@ -449,7 +511,7 @@ void MC6847ColorMode(int colorMode) {
     colorMap[COLOR_YELLOW] = SDL_MapRGB(screen_->surface->format, 255, 255, 192);
     colorMap[COLOR_BLUE] = SDL_MapRGB(screen_->surface->format, 0, 0, 255);
     colorMap[COLOR_RED] = SDL_MapRGB(screen_->surface->format, 255, 0, 0);
-    colorMap[COLOR_BUFF] = SDL_MapRGB(screen_->surface->format, 96, 0, 0);
+    colorMap[COLOR_BUFF] = SDL_MapRGB(screen_->surface->format, 240, 220, 130);
     colorMap[COLOR_CYAN] = SDL_MapRGB(screen_->surface->format, 0, 255, 255);
     colorMap[COLOR_MAGENTA] = SDL_MapRGB(screen_->surface->format, 255, 0, 255);
     colorMap[COLOR_ORANGE] = SDL_MapRGB(screen_->surface->format, 255, 128, 0);
@@ -475,6 +537,10 @@ void MC6847ColorMode(int colorMode) {
   colorTbl[0][2] = colorMap[COLOR_BUFF];
   colorTbl[0][3] = colorMap[COLOR_ORANGE];
 
+  // Screen 2; Paged screens
+  colorTbl[1][0] = colorMap[COLOR_BLACK];
+  colorTbl[1][1] = colorMap[COLOR_GREEN];
+
   // Screen 2
   colorTbl[2][0] = colorMap[COLOR_GREEN];
   colorTbl[2][1] = colorMap[COLOR_YELLOW];
@@ -489,7 +555,7 @@ void MC6847ColorMode(int colorMode) {
 
   // Screen 4
   colorTbl[4][0] = colorMap[COLOR_BLACK];
-  colorTbl[4][1] = colorMap[COLOR_GREEN];
+  colorTbl[4][1] = colorMap[COLOR_BUFF];
 
   // Screen 5
   colorTbl[5][0] = colorMap[COLOR_BLACK];
@@ -707,5 +773,5 @@ void SDLWaitQuit(void) {
 }
 
 int vdg_display_char() {
-  return screenMode == 0;
+  return paletteIndex == 0;
 }

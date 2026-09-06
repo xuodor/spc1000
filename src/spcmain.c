@@ -382,30 +382,22 @@ void spc_load_snapshot(char *filename, char* errmsg) {
  * @warning modified to accomodate 64K I/O address from original Marat's source
  */
 void OutZ80(register word Port, register byte Value) {
-  if ((Port & 0xE000) == 0x0000) // VRAM area
+  if ((Port & 0xE000) == 0x0000) {
     spc.IO.VRAM[Port] = Value;
-
-  else if ((Port & 0xE000) == 0xA000) // IPLK area
-  {
+  } else if ((Port & 0xE000) == 0xA000) {
     spc.IO.IPLK = (spc.IO.IPLK) ? 0 : 1; // flip IPLK switch
-  } else if ((Port & 0xE000) == 0x2000)  // GMODE setting
-  {
+  } else if ((Port & 0xE000) == 0x2000) {
     if (spc.IO.GMODE != Value) {
-      if (Value & 0x08) // XXX Graphic screen refresh
-        SetMC6847Mode(SET_GRAPHIC, Value);
-      else
-        SetMC6847Mode(SET_TEXTMODE, Value);
+      SetMC6847Mode(Value & 0x08 ? SET_GRAPHIC : SET_TEXTMODE, Value);
+      spc.IO.GMODE = Value;
     }
-    spc.IO.GMODE = Value;
-    DLOG("GMode:%02X\n", Value);
   } else if ((Port & 0xE000) == 0x6000) {
     CasIOWrite(&spc.IO.cas, Value);
   } else if ((Port & 0xFFFE) == 0x4000) {
-    if (Port & 0x01) // Data
-    {
+    if (Port & 0x01) {
+      // Data
       Write8910(&spc.IO.ay8910, (byte)spc.IO.psgRegNum, Value);
-    } else // Reg Num
-    {
+    } else {
       spc.IO.psgRegNum = Value;
       WrCtrl8910(&spc.IO.ay8910, Value);
     }
